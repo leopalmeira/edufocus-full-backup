@@ -22,18 +22,14 @@ def get_school_db(school_id):
     # Por simplicidade, abrimos nova conexão.
     db_path = os.path.join(DB_DIR, f'school_{school_id}.db')
     
-    # Inicializa se não existir
-    new_db = False
-    if not os.path.exists(db_path):
-        new_db = True
-        
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     
-    if new_db:
-        init_school_db(conn)
+    # Sempre inicializar para garantir que todas as tabelas existem
+    init_school_db(conn)
         
     return conn
+
 
 def init_system_db():
     conn = sqlite3.connect(SYSTEM_DB_PATH)
@@ -55,6 +51,8 @@ def init_system_db():
         email TEXT UNIQUE,
         password TEXT,
         address TEXT,
+        latitude REAL,
+        longitude REAL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')
     
@@ -87,6 +85,16 @@ def init_system_db():
         email TEXT UNIQUE,
         password TEXT,
         phone TEXT
+    )''')
+
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS inspectors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        school_id INTEGER,
+        name TEXT,
+        email TEXT UNIQUE,
+        password TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')
 
     cur.execute('''
@@ -129,13 +137,16 @@ def init_system_db():
     CREATE TABLE IF NOT EXISTS support_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ticket_id INTEGER,
+        school_id INTEGER,
         user_type TEXT,
         user_id INTEGER,
         message TEXT,
+        timestamp DATETIME,
         is_internal INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(ticket_id) REFERENCES support_tickets(id)
     )''')
+
     
     cur.execute('''
     CREATE TABLE IF NOT EXISTS camera_removal_requests (
@@ -224,5 +235,109 @@ def init_school_db(conn):
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
         notified_guardian INTEGER DEFAULT 0
     )''')
+
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS pickup_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        guardian_id INTEGER,
+        status TEXT DEFAULT 'waiting',
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS employees (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        role TEXT,
+        photo_url TEXT,
+        face_descriptor TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS employee_attendance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER,
+        timestamp DATETIME,
+        FOREIGN KEY(employee_id) REFERENCES employees(id)
+    )''')
+
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        description TEXT,
+        event_date DATE,
+        cost REAL,
+        class_name TEXT,
+        pix_key TEXT,
+        payment_deadline DATE,
+        type TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS event_participations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER,
+        student_id INTEGER,
+        status TEXT,
+        receipt_url TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(event_id) REFERENCES events(id),
+        FOREIGN KEY(student_id) REFERENCES students(id)
+    )''')
+    
+    # Migrações automáticas para garantir colunas em bancos existentes
+    updates = [
+        "ALTER TABLE events ADD COLUMN event_date DATE",
+        "ALTER TABLE events ADD COLUMN cost REAL",
+        "ALTER TABLE events ADD COLUMN class_name TEXT",
+        "ALTER TABLE events ADD COLUMN pix_key TEXT",
+        "ALTER TABLE events ADD COLUMN payment_deadline DATE",
+        "ALTER TABLE events ADD COLUMN type TEXT",
+        "ALTER TABLE students ADD COLUMN face_descriptor TEXT",
+        "ALTER TABLE event_participations ADD COLUMN receipt_url TEXT"
+    ]
+    for cmd in updates:
+        try:
+            cur.execute(cmd)
+        except:
+            pass
+            
+    # Garantir compatibilidade com versões antigas (se existirem colunas antigas target_type, target_id)
+    # Não removemos colunas no SQLite facilmente, então deixamos lá se existirem.
+
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS event_participations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER,
+        student_id INTEGER,
+        status TEXT DEFAULT 'pending',
+        FOREIGN KEY(event_id) REFERENCES events(id),
+        FOREIGN KEY(student_id) REFERENCES students(id)
+    )''')
+
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        school_id INTEGER,
+        sender_type TEXT, 
+        sender_id INTEGER,
+        message_type TEXT DEFAULT 'text',
+        content TEXT,
+        file_url TEXT,
+        file_name TEXT,
+        read INTEGER DEFAULT 0,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(student_id) REFERENCES students(id)
+    )''')
+
+    # Migração para garantir que a tabela exista em bancos antigos que tinham a tabela 'messages' simples
+    try:
+        cur.execute("ALTER TABLE chat_messages ADD COLUMN read INTEGER DEFAULT 0")
+    except: pass
 
     conn.commit()

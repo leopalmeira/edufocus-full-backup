@@ -1,1 +1,12 @@
 node_modules
+*.db
+*.sqlite
+server_python/uploads/
+uploads/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+dist/
+build/
+*.log

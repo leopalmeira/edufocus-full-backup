@@ -10,10 +10,24 @@ from routes.admin import admin_bp
 from routes.technician import technician_bp
 from routes.support import support_bp
 from routes.teacher import teacher_bp
+from routes.location import location_bp
 
 app = Flask(__name__, static_folder='../client/dist')
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0 # Desativar cache em desenvolvimento
-CORS(app)
+
+# Configuração CORS - permitir todas as origens em desenvolvimento
+CORS(app, resources={r"/api/*": {
+    "origins": ["http://localhost:5173", "http://localhost:3001", "http://127.0.0.1:5173", "http://127.0.0.1:3001"],
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+    "supports_credentials": True,
+    "expose_headers": ["Content-Type", "Authorization"]
+}})
+
+# Health check - rota crucial para monitoramento
+@app.route('/api/health')
+def health_check():
+    return {'status': 'healthy', 'service': 'edufocus-backend'}, 200
 
 # Inicializar DB ao arrancar
 with app.app_context():
@@ -28,6 +42,13 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(technician_bp)
 app.register_blueprint(support_bp)
 app.register_blueprint(teacher_bp)
+app.register_blueprint(location_bp)
+
+# Rota para servir Uploads
+UPLOAD_FOLDER_ROOT = os.path.join(os.getcwd(), 'uploads')
+@app.route('/uploads/<path:path>')
+def serve_uploads(path):
+    return send_from_directory(UPLOAD_FOLDER_ROOT, path)
 
 # Rota para servir o frontend (Client)
 @app.route('/')

@@ -150,7 +150,7 @@ export default function StudentFaceRegistration({ student, onClose, onSave }) {
         if (!bestDescriptor) return;
         setStatus('Salvando...');
         try {
-            await api.put(`/teacher/students/${student.id}/face`, {
+            await api.put(`/school/students/${student.id}/face`, {
                 face_descriptor: JSON.stringify(bestDescriptor)
             });
             onSave();

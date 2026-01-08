@@ -42,7 +42,14 @@ def login():
         if user:
             role = 'teacher'
             
-    # 4. Guardian (se login for pelo app principal, mas geralmente é separado)
+    # 4. Inspector
+    if not user:
+        cur.execute('SELECT * FROM inspectors WHERE email = ?', (email,))
+        user = cur.fetchone()
+        if user:
+            role = 'inspector'
+
+    # 5. Guardian
     if not user:
         cur.execute('SELECT * FROM guardians WHERE email = ?', (email,))
         user = cur.fetchone()
@@ -158,13 +165,23 @@ def token_required(f):
                 token = auth_header.split(" ")[1]
         
         if not token:
+            print(f"❌ Token ausente na requisição")
             return jsonify({'message': 'Token ausente'}), 401
             
         try:
             data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             g.user = data
+            print(f"✅ Token válido para usuário: {data.get('email', 'unknown')}")
+        except jwt.ExpiredSignatureError:
+            print(f"❌ Token expirado")
+            return jsonify({'message': 'Token expirado. Faça login novamente.'}), 403
+        except jwt.InvalidTokenError as e:
+            print(f"❌ Token inválido: {str(e)}")
+            return jsonify({'message': 'Token inválido'}), 403
         except Exception as e:
+            print(f"❌ Erro ao validar token: {str(e)}")
             return jsonify({'message': 'Token inválido'}), 403
             
         return f(*args, **kwargs)
     return decorated
+

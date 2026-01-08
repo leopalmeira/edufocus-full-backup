@@ -17,6 +17,7 @@ import ClassDetailsModal from '../components/ClassDetailsModal';
 import SupportTickets from '../components/SupportTickets';
 import EmployeeManagement from '../components/EmployeeManagement';
 import EmployeeAttendancePanel from '../components/EmployeeAttendancePanel';
+import SchoolPickupsManager from '../components/SchoolPickupsManager';
 import EmployeeAttendanceReport from '../components/EmployeeAttendanceReport';
 import { useAuth } from '../context/AuthContext';
 
@@ -117,7 +118,8 @@ export default function SchoolDashboard() {
         { id: 'events', label: 'Eventos', icon: <Calendar size={20} /> },
         { id: 'messages', label: 'Mensagens', icon: <MessageCircle size={20} /> },
         { id: 'support', label: 'Suporte', icon: <HelpCircle size={20} /> },
-        { id: 'faq', label: 'FAQ', icon: <FileText size={20} /> }
+        { id: 'faq', label: 'FAQ', icon: <FileText size={20} /> },
+        { id: 'pickups', label: 'Portaria (Geral)', icon: <Clock size={20} /> }
     ];
 
     const toggleMenu = (menuId) => {
@@ -819,6 +821,10 @@ export default function SchoolDashboard() {
                     <div className="fade-in">
                         <SchoolFAQ />
                     </div>
+                )}
+
+                {activeTab === 'pickups' && (
+                    <SchoolPickupsManager />
                 )}
             </div>
 

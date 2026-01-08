@@ -6,6 +6,7 @@ import SchoolDashboard from './SchoolDashboard';
 import TeacherDashboard from './TeacherDashboard';
 import RepresentativeDashboard from './RepresentativeDashboard';
 import TechnicianDashboard from './TechnicianDashboard';
+import InspectorDashboard from './InspectorDashboard';
 import ThemeToggle from '../components/ThemeToggle';
 
 export default function Dashboard() {
@@ -39,6 +40,8 @@ export default function Dashboard() {
             return <><RepresentativeDashboard /><ThemeToggle /></>;
         case 'technician':
             return <><TechnicianDashboard /><ThemeToggle /></>;
+        case 'inspector':
+            return <><InspectorDashboard /><ThemeToggle /></>;
         default:
             return <div>Unauthorized</div>;
     }

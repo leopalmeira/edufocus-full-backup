@@ -85,3 +85,17 @@ def register_departure():
         'student': student['name'],
         'timestamp': timestamp
     })
+
+@attendance_bp.route('/api/attendance/register', methods=['POST'])
+@token_required
+def register_attendance_generic():
+    # Adapter para o frontend que envia para /register com event_type
+    data = request.json
+    event_type = data.get('event_type')
+    
+    if event_type == 'arrival':
+        return register_arrival()
+    elif event_type == 'departure':
+        return register_departure()
+    
+    return jsonify({'message': 'Evento inválido'}), 400

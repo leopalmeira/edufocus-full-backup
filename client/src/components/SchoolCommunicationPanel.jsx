@@ -24,12 +24,13 @@ export default function SchoolCommunicationPanel({ schoolId, initialTab = 'event
     // EVENTS STATES
     const [events, setEvents] = useState([]);
     const [showEventModal, setShowEventModal] = useState(false);
-    const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', cost: '', className: '', pix_key: '', payment_deadline: '' });
+    const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', cost: '', className: '', pix_key: '', payment_deadline: '', type: 'event' });
     const [selectedEvent, setSelectedEvent] = useState(null); // For Details/Participants
     const [participants, setParticipants] = useState([]);
     const [showParticipantsModal, setShowParticipantsModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [editEvent, setEditEvent] = useState(null);
+    const [previewImage, setPreviewImage] = useState(null);
 
     // --- SHARED DATA LOADING ---
     useEffect(() => {
@@ -58,8 +59,13 @@ export default function SchoolCommunicationPanel({ schoolId, initialTab = 'event
         } catch (e) { }
     };
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     const handleCreateEvent = async () => {
         if (!newEvent.title || !newEvent.date) return alert('Campos obrigatórios: Título e Data');
+        if (isSubmitting) return;
+
+        setIsSubmitting(true);
         try {
             await api.post('/school/events', {
                 title: newEvent.title,
@@ -68,13 +74,18 @@ export default function SchoolCommunicationPanel({ schoolId, initialTab = 'event
                 cost: newEvent.cost ? parseFloat(newEvent.cost) : null,
                 class_name: newEvent.className || null,
                 pix_key: newEvent.pix_key || null,
-                payment_deadline: newEvent.payment_deadline || null
+                payment_deadline: newEvent.payment_deadline || null,
+                type: newEvent.type || 'event'
             });
             alert('Evento criado!');
             setShowEventModal(false);
-            setNewEvent({ title: '', description: '', date: '', cost: '', className: '', pix_key: '', payment_deadline: '' });
+            setNewEvent({ title: '', description: '', date: '', cost: '', className: '', pix_key: '', payment_deadline: '', type: 'event' });
             loadEvents();
-        } catch (e) { alert('Erro ao criar evento'); }
+        } catch (e) {
+            alert('Erro ao criar evento');
+        } finally {
+            setIsSubmitting(false);
+        }
     }
 
     const handleViewParticipants = async (evt) => {
@@ -117,7 +128,8 @@ export default function SchoolCommunicationPanel({ schoolId, initialTab = 'event
             cost: evt.cost || '',
             className: evt.class_name || '',
             pix_key: evt.pix_key || '',
-            payment_deadline: evt.payment_deadline ? evt.payment_deadline.split('T')[0] : ''
+            payment_deadline: evt.payment_deadline ? evt.payment_deadline.split('T')[0] : '',
+            type: evt.type || 'event'
         });
         setShowEditModal(true);
     }
@@ -134,7 +146,8 @@ export default function SchoolCommunicationPanel({ schoolId, initialTab = 'event
                 cost: editEvent.cost ? parseFloat(editEvent.cost) : null,
                 class_name: editEvent.className || null,
                 pix_key: editEvent.pix_key || null,
-                payment_deadline: editEvent.payment_deadline || null
+                payment_deadline: editEvent.payment_deadline || null,
+                type: editEvent.type || 'event'
             };
             console.log('Payload:', payload);
             const response = await api.put(`/school/events/${editEvent.id}`, payload);
@@ -180,22 +193,32 @@ export default function SchoolCommunicationPanel({ schoolId, initialTab = 'event
 
     const sendMessage = async () => {
         if (!msgContent.trim() && !uploadRef.current?.files[0]) return;
-        const formData = new FormData();
-        formData.append('content', msgContent);
-        if (uploadRef.current?.files[0]) formData.append('file', uploadRef.current.files[0]);
+
         try {
             if (isBroadcast && selectedClass) {
                 if (!confirm(`Confirmar envio para TODA a turma ${selectedClass.name}?`)) return;
+                const formData = new FormData();
+                formData.append('text', msgContent);
+                if (uploadRef.current?.files[0]) formData.append('file', uploadRef.current.files[0]);
                 formData.append('classId', selectedClass.id);
                 await api.post('/school/chat/broadcast', formData);
                 alert('Enviado!');
             } else if (selectedStudent) {
+                const formData = new FormData();
+                formData.append('content', msgContent);
+                formData.append('type', uploadRef.current?.files[0] ? 'file' : 'text');
+                if (uploadRef.current?.files[0]) {
+                    formData.append('file', uploadRef.current.files[0]);
+                }
                 await api.post(`/school/chat/${selectedStudent.id}/messages`, formData);
                 loadMessages();
             }
             setMsgContent('');
             if (uploadRef.current) uploadRef.current.value = '';
-        } catch (e) { alert('Erro ao enviar'); }
+        } catch (e) {
+            console.error('Erro ao enviar:', e);
+            alert('Erro ao enviar');
+        }
     }
 
     const handleFileUpload = (e) => {
@@ -366,11 +389,20 @@ export default function SchoolCommunicationPanel({ schoolId, initialTab = 'event
                                     <input type="date" className="input-field" style={{ colorScheme: 'dark' }} value={newEvent.payment_deadline} onChange={e => setNewEvent({ ...newEvent, payment_deadline: e.target.value })} />
                                 </div>
                             </div>
-                            <select className="input-field" style={{ background: '#334155', color: 'white' }} value={newEvent.className} onChange={e => setNewEvent({ ...newEvent, className: e.target.value })}>
-                                <option value="">Toda a Escola</option>
-                                {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                            </select>
-                            <button className="btn btn-primary" onClick={handleCreateEvent}>Publicar</button>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <select className="input-field" style={{ background: '#334155', color: 'white', flex: 1 }} value={newEvent.type} onChange={e => setNewEvent({ ...newEvent, type: e.target.value })}>
+                                    <option value="event">Evento / Comunicado</option>
+                                    <option value="trip">Passeio</option>
+                                    <option value="warning">Aviso Importante</option>
+                                </select>
+                                <select className="input-field" style={{ background: '#334155', color: 'white', flex: 1 }} value={newEvent.className} onChange={e => setNewEvent({ ...newEvent, className: e.target.value })}>
+                                    <option value="">Toda a Escola</option>
+                                    {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                </select>
+                            </div>
+                            <button className="btn btn-primary" onClick={handleCreateEvent} disabled={isSubmitting}>
+                                {isSubmitting ? 'Publicando...' : 'Publicar'}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -384,6 +416,29 @@ export default function SchoolCommunicationPanel({ schoolId, initialTab = 'event
                             <h3>Participantes: {selectedEvent.title}</h3>
                             <button onClick={() => setShowParticipantsModal(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={24} /></button>
                         </div>
+
+                        {/* STATS SUMMARY */}
+                        <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '12px' }}>
+                            <div style={{ textAlign: 'center', flex: 1, borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#fff' }}>
+                                    {(selectedEvent.class_name ? students.filter(s => s.class_name === selectedEvent.class_name) : students).length}
+                                </div>
+                                <div style={{ fontSize: '13px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Alunos</div>
+                            </div>
+                            <div style={{ textAlign: 'center', flex: 1, borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#34d399' }}>
+                                    {participants.filter(p => p.status === 'confirmed' || p.status === 'paid').length}
+                                </div>
+                                <div style={{ fontSize: '13px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Confirmados</div>
+                            </div>
+                            <div style={{ textAlign: 'center', flex: 1 }}>
+                                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#f87171' }}>
+                                    {(selectedEvent.class_name ? students.filter(s => s.class_name === selectedEvent.class_name) : students).length - participants.filter(p => p.status === 'confirmed' || p.status === 'paid').length}
+                                </div>
+                                <div style={{ fontSize: '13px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Faltam</div>
+                            </div>
+                        </div>
+
                         <div style={{ flex: 1, overflowY: 'auto' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                                 <thead>
@@ -392,6 +447,7 @@ export default function SchoolCommunicationPanel({ schoolId, initialTab = 'event
                                         <th style={{ padding: '10px' }}>Turma</th>
                                         <th style={{ padding: '10px' }}>Status</th>
                                         <th style={{ padding: '10px' }}>Data Confirmação</th>
+                                        <th style={{ padding: '10px' }}>Comprovante</th>
                                         <th style={{ padding: '10px' }}>Ações</th>
                                     </tr>
                                 </thead>
@@ -408,7 +464,28 @@ export default function SchoolCommunicationPanel({ schoolId, initialTab = 'event
                                                 {p.status === 'paid' && <span style={{ color: '#34d399', background: 'rgba(52, 211, 153, 0.2)', padding: '2px 8px', borderRadius: '4px' }}>Pago</span>}
                                                 {p.status === 'pending' && <span style={{ color: '#fbbf24', background: 'rgba(251, 191, 36, 0.2)', padding: '2px 8px', borderRadius: '4px' }}>Pendente</span>}
                                             </td>
-                                            <td style={{ padding: '10px' }}>{new Date(p.confirmed_at).toLocaleDateString()}</td>
+                                            <td style={{ padding: '10px' }}>
+                                                {p.created_at ? new Date(p.created_at.replace(' ', 'T')).toLocaleDateString('pt-BR') + ' ' + new Date(p.created_at.replace(' ', 'T')).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                            </td>
+
+                                            <td style={{ padding: '10px' }}>
+                                                {p.receipt_url ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => setPreviewImage(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${p.receipt_url}`)}>
+                                                        <div style={{ width: '50px', height: '50px', overflow: 'hidden', borderRadius: '6px', border: '2px solid rgba(255,255,255,0.1)', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            {/\.pdf$/i.test(p.receipt_url) ? (
+                                                                <span style={{ fontSize: '20px' }}>📄</span>
+                                                            ) : (
+                                                                <img
+                                                                    src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${p.receipt_url}`}
+                                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                                    onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span style="font-size:20px;">❓</span>' }}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                        <span style={{ color: '#38bdf8', fontSize: '12px', textDecoration: 'underline' }}>Ver</span>
+                                                    </div>
+                                                ) : <span style={{ color: '#64748b', fontSize: '12px' }}>—</span>}
+                                            </td>
                                             <td style={{ padding: '10px', display: 'flex', gap: '5px' }}>
                                                 <button onClick={() => handleUpdateStatus(p.id, 'paid')} style={{ background: '#059669', border: 'none', borderRadius: '4px', padding: '4px', color: 'white', cursor: 'pointer' }} title="Marcar como Pago"><CheckCircle size={16} /></button>
                                                 <button onClick={() => handleUpdateStatus(p.id, 'confirmed')} style={{ background: '#2563eb', border: 'none', borderRadius: '4px', padding: '4px', color: 'white', cursor: 'pointer' }} title="Confirmar Presença"><Users size={16} /></button>
@@ -448,12 +525,33 @@ export default function SchoolCommunicationPanel({ schoolId, initialTab = 'event
                                 <label style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px', display: 'block' }}>Data Limite Pagamento</label>
                                 <input type="date" className="input-field" style={{ colorScheme: 'dark' }} value={editEvent.payment_deadline} onChange={e => setEditEvent({ ...editEvent, payment_deadline: e.target.value })} />
                             </div>
-                            <select className="input-field" style={{ background: '#334155', color: 'white' }} value={editEvent.className} onChange={e => setEditEvent({ ...editEvent, className: e.target.value })}>
-                                <option value="">Toda a Escola</option>
-                                {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                            </select>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <select className="input-field" style={{ background: '#334155', color: 'white', flex: 1 }} value={editEvent.type} onChange={e => setEditEvent({ ...editEvent, type: e.target.value })}>
+                                    <option value="event">Evento / Comunicado</option>
+                                    <option value="trip">Passeio</option>
+                                    <option value="warning">Aviso Importante</option>
+                                </select>
+                                <select className="input-field" style={{ background: '#334155', color: 'white', flex: 1 }} value={editEvent.className} onChange={e => setEditEvent({ ...editEvent, className: e.target.value })}>
+                                    <option value="">Toda a Escola</option>
+                                    {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                </select>
+                            </div>
                             <button className="btn btn-primary" onClick={handleSaveEdit}>💾 Salvar Alterações</button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* === IMAGE PREVIEW MODAL === */}
+            {previewImage && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000 }} onClick={() => setPreviewImage(null)}>
+                    <div style={{ width: '90%', height: '90%', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                        <button style={{ position: 'absolute', top: -40, right: 0, background: 'none', border: 'none', color: 'white', cursor: 'pointer' }} onClick={() => setPreviewImage(null)}><X size={32} /></button>
+                        {/\.pdf$/i.test(previewImage) ? (
+                            <iframe src={previewImage} style={{ width: '100%', height: '100%', borderRadius: '8px', border: 'none', background: 'white' }}></iframe>
+                        ) : (
+                            <img src={previewImage} style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: '8px', boxShadow: '0 0 20px rgba(0,0,0,0.5)' }} />
+                        )}
                     </div>
                 </div>
             )}

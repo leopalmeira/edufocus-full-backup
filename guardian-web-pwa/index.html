@@ -477,6 +477,80 @@
             margin-top: 4px;
         }
 
+        /* Cards de Eventos */
+        .event-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .event-title {
+            font-weight: 700;
+            font-size: 16px;
+            color: #111827;
+            margin: 0;
+        }
+
+        .badge-cost {
+            background: #ecfdf5;
+            color: #059669;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .event-desc {
+            color: #4b5563;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 12px;
+        }
+
+        .event-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 12px;
+        }
+
+        .event-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .event-footer {
+            border-top: 1px solid #f3f4f6;
+            padding-top: 8px;
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .pix-box {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 12px;
+            font-size: 13px;
+            color: #92400e;
+        }
+
+        /* ... outros estilos ... */
         .chat-input-bar {
             position: fixed;
             bottom: 0;
@@ -791,6 +865,7 @@
                         <input type="text" id="studentInput" class="input" placeholder="Digite o nome..."
                             oninput="searchStudent()">
                     </div>
+                    <div id="studentResults"></div>
                 </div>
 
                 <div id="step4" class="hidden">
@@ -950,47 +1025,88 @@
                     <label class="label">Telefone</label>
                     <input type="tel" id="settingsPhone" class="input">
                 </div>
-                <button class="btn-primary">Salvar</button>
-                <button class="btn-secondary" onclick="logout()">Sair</button>
+                <button class="btn-primary" onclick="testNotification()"
+                    style="background-color: #f59e0b; margin-top: 10px;">🔔 Testar Som/Notificação</button>
+                <button class="btn-secondary" onclick="logout()" style="margin-top: 10px;">Sair</button>
             </div>
         </div>
 
-        <!-- Bottom Navigation -->
-        <div class="bottom-nav hidden" id="bottomNav">
-            <div class="nav-item active" onclick="navigate('home')">
-                <div class="nav-icon">🏠</div>
-                <div class="nav-label">Início</div>
-            </div>
-            <div class="nav-item" onclick="navigate('reports')">
-                <div class="nav-icon">📊</div>
-                <div class="nav-label" style="line-height:1.1; font-size:10px;">Frequência<br>Escolar</div>
-            </div>
-            <div class="nav-item" onclick="navigate('notifications')">
-                <div class="nav-icon">📅</div>
-                <div class="nav-label">Eventos</div>
-            </div>
-            <div class="nav-item" onclick="navigate('messages')">
-                <div class="nav-icon">💬</div>
-                <div class="nav-label">Mensagens</div>
-            </div>
-            <div class="nav-item" onclick="navigate('settings')">
-                <div class="nav-icon">⚙️</div>
-                <div class="nav-label">Conta</div>
-            </div>
-        </div>
         <script>
-            // Desbloquear AudioContext com interação do usuário (obrigatório em navegadores modernos)
-            window.audioCtxGlobal = null;
-            document.addEventListener('click', () => {
-                if (!window.audioCtxGlobal) {
-                    const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    window.audioCtxGlobal = new AudioContext();
-                }
-                if (window.audioCtxGlobal.state === 'suspended') {
+            function testNotification() {
+                // Desbloquear audio context se necessário
+                if (window.audioCtxGlobal && window.audioCtxGlobal.state === 'suspended') {
                     window.audioCtxGlobal.resume();
                 }
-            }, { once: false }); // Tenta desbloquear em qualquer clique
+                const mock = {
+                    id: Math.floor(Math.random() * 10000),
+                    school_name: 'Escola Exemplo',
+                    student_name: 'Seu Filho',
+                    event_type: 'arrival',
+                    timestamp: new Date().toISOString(),
+                    photo_url: null,
+                    class_name: 'Teste de Som'
+                };
+                showNotificationOverlay(mock);
+            }
+
+            function loadSettings() {
+                // Carregar dados do responsável logado
+                if (user) {
+                    document.getElementById('settingsName').value = user.name || '';
+                    document.getElementById('settingsEmail').value = user.email || '';
+                    document.getElementById('settingsPhone').value = user.phone || '';
+                }
+            }
+
+            function logout() {
+                if (confirm('Deseja realmente sair?')) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    user = null;
+                    myStudentsData = [];
+                    stopNotificationPoller();
+                    showLogin();
+                }
+            }
         </script>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav hidden" id="bottomNav">
+        <div class="nav-item active" onclick="navigate('home')">
+            <div class="nav-icon">🏠</div>
+            <div class="nav-label">Início</div>
+        </div>
+        <div class="nav-item" onclick="navigate('reports')">
+            <div class="nav-icon">📊</div>
+            <div class="nav-label" style="line-height:1.1; font-size:10px;">Frequência<br>Escolar</div>
+        </div>
+        <div class="nav-item" onclick="navigate('notifications')">
+            <div class="nav-icon">📅</div>
+            <div class="nav-label">Eventos</div>
+        </div>
+        <div class="nav-item" onclick="navigate('messages')">
+            <div class="nav-icon">💬</div>
+            <div class="nav-label">Mensagens</div>
+        </div>
+        <div class="nav-item" onclick="navigate('settings')">
+            <div class="nav-icon">⚙️</div>
+            <div class="nav-label">Conta</div>
+        </div>
+    </div>
+    <script>
+        // Desbloquear AudioContext com interação do usuário (obrigatório em navegadores modernos)
+        window.audioCtxGlobal = null;
+        document.addEventListener('click', () => {
+            if (!window.audioCtxGlobal) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                window.audioCtxGlobal = new AudioContext();
+            }
+            if (window.audioCtxGlobal.state === 'suspended') {
+                window.audioCtxGlobal.resume();
+            }
+        }, { once: false }); // Tenta desbloquear em qualquer clique
+    </script>
     </div>
 
     <script>
@@ -1099,6 +1215,17 @@
                 const res = await fetch(`${API_URL}/guardian/check-notifications`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+
+                // Se token inválido, forçar re-login
+                if (res.status === 401 || res.status === 403) {
+                    console.log('🔒 Token inválido detectado, forçando re-login...');
+                    stopNotificationPoller();
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    user = null;
+                    showLogin();
+                    return;
+                }
 
                 if (!res.ok) return;
 
@@ -1284,28 +1411,28 @@
             document.body.appendChild(overlay);
 
             // Som: "Ding Dong" Moderno (Mais alto e claro)
-            // Som: "Ding Dong" Moderno (Mais alto e claro)
+            // Som: "Ding Dong" Moderno + Fala (TTS)
             const playSound = async () => {
+                // 1. Tentar tocar o som (Oscilador)
                 try {
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    // Tenta usar o global desbloqueado ou cria um novo
-                    const audioCtx = window.audioCtxGlobal || new AudioContext();
+                    const audioCtx = window.audioCtxGlobal || new AudioContext(); // Tenta global ou cria novo
 
                     if (audioCtx.state === 'suspended') {
-                        await audioCtx.resume();
+                        await audioCtx.resume().catch(() => console.log('Áudio autoplay bloqueado'));
                     }
 
-                    const playTone = (freq, startTime, duration) => {
+                    const playBell = (freq, startTime, duration) => {
                         const osc = audioCtx.createOscillator();
                         const gain = audioCtx.createGain();
+                        osc.type = 'triangle'; // Timbre mais metálico (sino)
 
-                        osc.type = 'sine';
-                        osc.frequency.value = freq;
+                        osc.frequency.setValueAtTime(freq, startTime);
 
-                        // Volume alto e sem fade-in lento para garantir ataque
-                        gain.gain.setValueAtTime(0.1, startTime);
-                        gain.gain.exponentialRampToValueAtTime(1.0, startTime + 0.1);
-                        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+                        // Envelope percussivo de sino
+                        gain.gain.setValueAtTime(0, startTime);
+                        gain.gain.linearRampToValueAtTime(0.6, startTime + 0.05); // Ataque rápido mas suave
+                        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration); // Decay longo
 
                         osc.connect(gain);
                         gain.connect(audioCtx.destination);
@@ -1315,17 +1442,36 @@
                     };
 
                     const now = audioCtx.currentTime;
-                    // Ding (Mi)
-                    playTone(660, now, 1.0);
-                    // Dong (Dó)
-                    playTone(523, now + 0.8, 1.5);
-
-                    // Vibração extra
-                    if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
-
+                    // Ding (Mi 5 - ~660Hz)
+                    playBell(660, now, 1.5);
+                    // Dong (Dó 5 - ~523Hz) - Mais grave e longo
+                    playBell(523, now + 0.5, 2.0);
                 } catch (e) {
-                    console.error("Erro ao tocar som:", e);
+                    console.error("Erro no som digital:", e);
                 }
+
+                // 2. FALA (Text-to-Speech) - Backup robusto que funciona em muitos bloqueios
+                if ('speechSynthesis' in window) {
+                    try {
+                        const msg = new SpeechSynthesisUtterance();
+                        // Texto dinâmico
+                        const acao = notif.event_type === 'arrival' ? 'chegou na escola' : 'saiu da escola';
+                        // msg.text = `EduFocus informa: ${notif.student_name} ${acao}.`;
+                        // Alterado para falar em nome da escola
+                        const schoolName = notif.school_name || 'A escola';
+                        msg.text = `${schoolName} informa: ${notif.student_name} ${acao}.`;
+                        msg.lang = 'pt-BR';
+                        msg.volume = 1;
+                        msg.rate = 1.1; // Um pouco mais rápido e natural
+                        msg.pitch = 1.0;
+                        window.speechSynthesis.speak(msg);
+                    } catch (e) {
+                        console.error("Erro na fala:", e);
+                    }
+                }
+
+                // 3. Vibração
+                if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
             };
             playSound();
 
@@ -1395,7 +1541,6 @@
         async function markAsRead(notificationId) {
             try {
                 const token = localStorage.getItem('token');
-                // Correção: URL sem espaços extras
                 await fetch(`${API_URL}/guardian/notifications/${notificationId}/read`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -1403,55 +1548,71 @@
             } catch (error) { console.error('Erro ao marcar como lida:', error); }
         }
 
-        function navigate(page) {
-            const screens = ['loginScreen', 'registerScreen', 'homeScreen', 'linkScreen', 'reportsScreen', 'notificationsScreen', 'messagesScreen', 'settingsScreen'];
-            screens.forEach(id => document.getElementById(id).classList.add('hidden'));
+        // Variável global para o intervalo de polling
+        let eventsPollingInterval = null;
 
+        function navigate(page) {
+            // Limpar polling se não estiver na tela de eventos
+            if (eventsPollingInterval) {
+                console.log('🔄 Parando Polling anterior...');
+                clearInterval(eventsPollingInterval);
+                eventsPollingInterval = null;
+            }
+            // Ocultar todas as telas
+            const screens = ['loginScreen', 'registerScreen', 'homeScreen', 'linkScreen', 'reportsScreen', 'notificationsScreen', 'messagesScreen', 'settingsScreen', 'chatScreen'];
+            screens.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            });
+
+            // Gerenciar menu inferior
+            const bottomNav = document.getElementById('bottomNav');
             const navItems = document.querySelectorAll('.nav-item');
             navItems.forEach(item => item.classList.remove('active'));
 
-            const bottomNav = document.getElementById('bottomNav');
+            // Navegação
+            if (page === 'home') {
+                document.getElementById('homeScreen').classList.remove('hidden');
+                bottomNav.classList.remove('hidden');
+                navItems[0].classList.add('active');
+                loadChildren();
+            }
+            else if (page === 'reports') {
+                document.getElementById('reportsScreen').classList.remove('hidden');
+                bottomNav.classList.remove('hidden');
+                navItems[1].classList.add('active');
+                loadReportScreen();
+            }
+            else if (page === 'notifications') {
+                document.getElementById('notificationsScreen').classList.remove('hidden');
+                bottomNav.classList.remove('hidden');
+                navItems[2].classList.add('active');
+                console.log('📌 Navegando para Eventos...');
 
-            switch (page) {
-                case 'home':
-                    document.getElementById('homeScreen').classList.remove('hidden');
-                    bottomNav.classList.remove('hidden');
-                    navItems[0].classList.add('active');
-                    loadChildren();
-                    break;
-                case 'reports':
-                    document.getElementById('reportsScreen').classList.remove('hidden');
-                    bottomNav.classList.remove('hidden');
-                    navItems[1].classList.add('active');
-                    loadReportScreen();
-                    break;
-                case 'notifications':
-                    document.getElementById('notificationsScreen').classList.remove('hidden');
-                    bottomNav.classList.remove('hidden');
-                    navItems[2].classList.add('active');
+                // Carregar eventos inicialmente
+                if (typeof loadEventsAndNotifications === 'function') {
                     loadEventsAndNotifications();
-                    break;
-                case 'messages':
-                    document.getElementById('messagesScreen').classList.remove('hidden');
-                    bottomNav.classList.remove('hidden');
-                    navItems[3].classList.add('active');
-                    loadChatList();
-                    break;
-                case 'settings':
-                    document.getElementById('settingsScreen').classList.remove('hidden');
-                    bottomNav.classList.remove('hidden');
-                    navItems[4].classList.add('active');
-                    if (user) {
-                        document.getElementById('settingsName').value = user.name;
-                        document.getElementById('settingsEmail').value = user.email;
-                        document.getElementById('settingsPhone').value = user.phone || '';
-                    }
-                    break;
-                case 'link':
-                    document.getElementById('linkScreen').classList.remove('hidden');
-                    bottomNav.classList.add('hidden');
-                    resetLink();
-                    break;
+                }
+
+                // Iniciar SSE (Server-Sent Events) para atualizações em tempo real
+                startEventsSSE();
+            }
+            else if (page === 'messages') {
+                document.getElementById('messagesScreen').classList.remove('hidden');
+                bottomNav.classList.remove('hidden');
+                navItems[3].classList.add('active');
+                loadChatList();
+            }
+            else if (page === 'settings') {
+                document.getElementById('settingsScreen').classList.remove('hidden');
+                bottomNav.classList.remove('hidden');
+                navItems[4].classList.add('active');
+                if (typeof loadSettings === 'function') loadSettings();
+            }
+            else if (page === 'link') {
+                document.getElementById('linkScreen').classList.remove('hidden');
+                bottomNav.classList.add('hidden');
+                if (typeof resetLink === 'function') resetLink();
             }
         }
 
@@ -1575,44 +1736,56 @@
         let studentTimeout;
         async function searchStudent() {
             const query = document.getElementById('studentInput').value.trim();
+            const resultsDiv = document.getElementById('studentResults');
 
-            if (query.length < 3) return;
+            if (query.length < 2) {
+                if (resultsDiv) resultsDiv.innerHTML = '';
+                return;
+            }
 
             clearTimeout(studentTimeout);
             studentTimeout = setTimeout(async () => {
                 try {
-                    const token = localStorage.getItem('token');
-                    // Busca aluno específico na turma selecionada
+                    // Busca aluno na turma selecionada (endpoint público)
                     const url = `${API_URL}/guardian/schools/${selectedSchool.id}/students/search?name=${encodeURIComponent(query)}&className=${encodeURIComponent(selectedClass)}`;
-                    const res = await fetch(url, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-
-                    // O servidor retorna array de alunos encontrados
+                    const res = await fetch(url);
                     const students = await res.json();
 
-                    if (students.length > 0) {
-                        selectedStudent = students[0];
+                    if (!resultsDiv) return;
 
-                        document.getElementById('step3').classList.add('hidden');
-                        document.getElementById('step4').classList.remove('hidden');
-                        updateStep(4);
-
-                        const photoDiv = document.getElementById('previewPhoto');
-                        if (selectedStudent.photo_url) {
-                            photoDiv.innerHTML = `<img src="${selectedStudent.photo_url}">`;
-                        } else {
-                            photoDiv.textContent = selectedStudent.name.charAt(0).toUpperCase();
-                        }
-
-                        document.getElementById('previewName').textContent = selectedStudent.name;
-                        document.getElementById('previewDetails').textContent = `${selectedClass} • ${selectedSchool.name}`;
+                    if (students.length === 0) {
+                        resultsDiv.innerHTML = '<div class="result-item" style="color: #999;">Nenhum aluno encontrado</div>';
+                    } else {
+                        resultsDiv.innerHTML = students.map(s => `
+                            <div class="result-item" onclick="selectStudent(${JSON.stringify(s).replace(/"/g, '&quot;')})">
+                                👤 ${s.name}
+                            </div>
+                        `).join('');
                     }
                 } catch (error) {
-                    console.error('Erro:', error);
+                    console.error('Erro na busca:', error);
                 }
-            }, 800);
+            }, 300);
         }
+
+        function selectStudent(student) {
+            selectedStudent = student;
+
+            document.getElementById('step3').classList.add('hidden');
+            document.getElementById('step4').classList.remove('hidden');
+            updateStep(4);
+
+            const photoDiv = document.getElementById('previewPhoto');
+            if (selectedStudent.photo_url) {
+                photoDiv.innerHTML = `<img src="${selectedStudent.photo_url}">`;
+            } else {
+                photoDiv.textContent = selectedStudent.name.charAt(0).toUpperCase();
+            }
+
+            document.getElementById('previewName').textContent = selectedStudent.name;
+            document.getElementById('previewDetails').textContent = `${selectedClass} • ${selectedSchool.name}`;
+        }
+
 
         async function confirmLink() {
             const errorDiv = document.getElementById('linkError');
@@ -1620,9 +1793,19 @@
             errorDiv.classList.add('hidden');
             successDiv.classList.add('hidden');
 
-            try {
-                const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token');
 
+            // Verificar se está logado
+            if (!token || !user) {
+                errorDiv.textContent = '❌ Você precisa fazer login primeiro para vincular um filho.';
+                errorDiv.classList.remove('hidden');
+                setTimeout(() => {
+                    showLogin();
+                }, 2000);
+                return;
+            }
+
+            try {
                 const res = await fetch(`${API_URL}/guardian/link-student`, {
                     method: 'POST',
                     headers: {
@@ -1638,10 +1821,22 @@
                 const data = await res.json();
 
                 if (!res.ok) {
+                    if (res.status === 401 || res.status === 403) {
+                        // Token inválido - limpar e forçar re-login
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                        user = null;
+                        errorDiv.textContent = '❌ Sessão expirada. Redirecionando para login...';
+                        errorDiv.classList.remove('hidden');
+                        setTimeout(() => {
+                            showLogin();
+                        }, 1500);
+                        return;
+                    }
                     throw new Error(data.message || 'Erro ao vincular');
                 }
 
-                successDiv.textContent = `✅ ${selectedStudent.name} vinculado!`;
+                successDiv.textContent = `✅ ${selectedStudent.name} vinculado com sucesso!`;
                 successDiv.classList.remove('hidden');
 
                 setTimeout(() => {
@@ -1652,6 +1847,7 @@
                 errorDiv.classList.remove('hidden');
             }
         }
+
 
         async function register() {
             const name = document.getElementById('regName').value.trim();
@@ -1749,13 +1945,12 @@
             const div = document.getElementById('childrenList');
 
             try {
-                const res = await fetch(`${API_URL}/guardian/my-students`, {
+                const res = await fetch(`${API_URL}/guardian/students`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
                 const data = await res.json();
-                // O servidor retorna um array diretamente (não em data.data.students)
-                const children = Array.isArray(data) ? data : (data.data?.students || []);
+                const children = data.data?.students || [];
                 myStudentsData = children;
 
                 if (user) {
@@ -1773,19 +1968,254 @@
                     return;
                 }
 
-                div.innerHTML = children.map(child => `
-                    <div class="child-card">
-                        <div class="child-avatar">
-                            ${child.photo_url ? `<img src="${child.photo_url}">` : child.name.charAt(0).toUpperCase()}
+                div.innerHTML = children.map(child => {
+                    const hasCoords = child.latitude && child.longitude;
+                    return `
+                        <div class="child-card" style="flex-direction: column; align-items: stretch; gap: 16px; padding: 16px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div class="child-avatar">
+                                    ${child.photo_url ? `<img src="${child.photo_url}">` : child.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div class="child-info">
+                                    <div class="child-name">${child.name}</div>
+                                    <div class="child-details">${child.class_name || 'Sem turma'} • ${child.school_name || ''}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="pickup-container-${child.id}" style="margin-top: 4px;">
+                                <div id="dist-info-${child.id}" style="font-size: 12px; color: #6b7280; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                                    ${hasCoords ? '<span>📍 Calculando distância...</span>' : '<span style="color: #9ca3af;">📍 Localização da escola não configurada</span>'}
+                                </div>
+                                
+                                <!-- Botão principal: só ativo quando próximo da escola -->
+                                <button id="pickup-btn-${child.id}" 
+                                        class="btn-primary" 
+                                        style="width: 100%; background: #94a3b8; font-size: 14px; padding: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; opacity: 0.6; cursor: not-allowed;"
+                                        onclick="requestPickup(${child.id}, ${child.school_id})"
+                                        disabled>
+                                    🚗 Aguardando aproximação...
+                                </button>
+                                
+                                <!-- Botão secundário: autorizar de longe (outra pessoa buscar) -->
+                                <button id="remote-btn-${child.id}" 
+                                        class="btn-secondary" 
+                                        style="width: 100%; margin-top: 8px; font-size: 13px; padding: 12px; display: none; align-items: center; justify-content: center; gap: 8px; background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);"
+                                        onclick="requestRemotePickup(${child.id}, ${child.school_id}, '${child.name.replace(/'/g, "\\'")}')">
+                                    ⚠️ Autorizar de Longe (Outra Pessoa Buscar)
+                                </button>
+                            </div>
                         </div>
-                        <div class="child-info">
-                            <div class="child-name">${child.name}</div>
-                            <div class="child-details">${child.class_name || 'Sem turma'} • ${child.schoolName || child.school_name || ''}</div>
-                        </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
+
+                // Iniciar monitoramento de distância se houver coordenadas
+                children.forEach(child => {
+                    if (child.latitude && child.longitude) {
+                        startDistanceTracking(child);
+                    }
+                });
+
             } catch (error) {
                 console.error('Erro:', error);
+            }
+        }
+
+        const distanceTrackers = {};
+
+        function startDistanceTracking(child) {
+            if (distanceTrackers[child.id]) clearInterval(distanceTrackers[child.id]);
+
+            const track = () => {
+                if (!navigator.geolocation) return;
+
+                navigator.geolocation.getCurrentPosition(position => {
+                    const dist = calculateDistance(
+                        position.coords.latitude,
+                        position.coords.longitude,
+                        child.latitude,
+                        child.longitude
+                    );
+
+                    const infoDiv = document.getElementById(`dist-info-${child.id}`);
+                    const btn = document.getElementById(`pickup-btn-${child.id}`);
+                    const remoteBtn = document.getElementById(`remote-btn-${child.id}`);
+
+                    // Calcular distância em metros
+                    const distMeters = dist * 1000;
+
+                    if (infoDiv) {
+                        const distText = dist < 1 ? `${distMeters.toFixed(0)}m` : `${dist.toFixed(1)}km`;
+                        const statusColor = distMeters <= 20 ? '#10b981' : (distMeters <= 200 ? '#f59e0b' : '#ef4444');
+                        infoDiv.innerHTML = `<span style="color: ${statusColor};">📍 Você está a <b>${distText}</b> da escola</span>`;
+                    }
+
+                    if (btn) {
+                        // REGRA: Só ativa o botão se estiver a <= 20 metros
+                        if (distMeters <= 20) {
+                            // PRÓXIMO - Ativar botão
+                            btn.disabled = false;
+                            btn.style.opacity = '1';
+                            btn.style.cursor = 'pointer';
+                            btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                            btn.style.boxShadow = '0 4px 20px rgba(16, 185, 129, 0.4)';
+                            btn.innerHTML = '✅ Estou na Escola - Notificar Chegada!';
+                            btn.classList.add('pulse-animation');
+
+                            // Esconder botão de autorização remota quando próximo
+                            if (remoteBtn) remoteBtn.style.display = 'none';
+
+                        } else if (distMeters <= 200) {
+                            // CHEGANDO (até 200m) - Ainda não pode clicar, mas está perto
+                            btn.disabled = true;
+                            btn.style.opacity = '0.8';
+                            btn.style.cursor = 'not-allowed';
+                            btn.style.background = '#f59e0b';
+                            btn.style.boxShadow = 'none';
+                            btn.innerHTML = `🚶 Aproxime-se mais (${distMeters.toFixed(0)}m)`;
+                            btn.classList.remove('pulse-animation');
+
+                            // Mostrar botão de autorização remota
+                            if (remoteBtn) remoteBtn.style.display = 'flex';
+
+                        } else {
+                            // LONGE - Desativado, mostrar opção de autorização remota
+                            btn.disabled = true;
+                            btn.style.opacity = '0.5';
+                            btn.style.cursor = 'not-allowed';
+                            btn.style.background = '#94a3b8';
+                            btn.style.boxShadow = 'none';
+                            btn.style.transform = 'scale(1)';
+                            btn.innerHTML = '🚗 Vá até a escola para notificar';
+                            btn.classList.remove('pulse-animation');
+
+                            // Mostrar botão de autorização remota
+                            if (remoteBtn) remoteBtn.style.display = 'flex';
+                        }
+                    }
+                }, err => {
+                    console.error('Erro de geo:', err);
+                    // Se não conseguir localização, mostrar botão de autorização remota
+                    const remoteBtn = document.getElementById(`remote-btn-${child.id}`);
+                    if (remoteBtn) remoteBtn.style.display = 'flex';
+                }, { enableHighAccuracy: true, timeout: 10000 });
+            };
+
+            track();
+            distanceTrackers[child.id] = setInterval(track, 5000); // Atualiza a cada 5 segundos
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        async function requestPickup(studentId, schoolId) {
+            const btn = document.getElementById(`pickup-btn-${studentId}`);
+            const originalText = btn.innerHTML;
+
+            try {
+                btn.disabled = true;
+                btn.innerHTML = 'Enviando...';
+
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/guardian/pickup`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ student_id: studentId, school_id: schoolId })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    btn.style.background = '#059669';
+                    btn.innerHTML = '✅ Notificado!';
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    }, 5000);
+                } else {
+                    alert(data.message || 'Erro ao notificar');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            } catch (error) {
+                alert('Erro na conexão');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        // Função para autorização remota (quando responsável está longe e outra pessoa vai buscar)
+        async function requestRemotePickup(studentId, schoolId, studentName) {
+            // Mostrar modal de confirmação
+            const confirmed = confirm(
+                `⚠️ ATENÇÃO: AUTORIZAÇÃO REMOTA\n\n` +
+                `Você está longe da escola e está autorizando a retirada de:\n\n` +
+                `👤 ${studentName}\n\n` +
+                `Isso significa que OUTRA PESSOA irá buscar seu filho(a) na escola.\n\n` +
+                `A escola será notificada de que você autorizou a retirada remotamente.\n\n` +
+                `Deseja realmente autorizar?`
+            );
+
+            if (!confirmed) {
+                return; // Usuário cancelou
+            }
+
+            const btn = document.getElementById(`remote-btn-${studentId}`);
+            const originalText = btn.innerHTML;
+
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Enviando autorização...';
+
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/guardian/pickup`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        student_id: studentId,
+                        school_id: schoolId,
+                        remote_authorization: true // Flag indicando que foi autorização remota
+                    })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    btn.style.background = 'rgba(16, 185, 129, 0.2)';
+                    btn.style.color = '#10b981';
+                    btn.style.border = '1px solid #10b981';
+                    btn.innerHTML = '✅ Autorização enviada!';
+
+                    // Mostrar alerta de sucesso
+                    alert(`✅ Autorização remota enviada!\n\nA escola foi notificada que você autorizou a retirada de ${studentName}.\n\nLembre-se: Somente pessoas autorizadas poderão retirar.`);
+
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                        btn.style.background = 'rgba(239, 68, 68, 0.1)';
+                        btn.style.color = '#ef4444';
+                        btn.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                    }, 10000);
+                } else {
+                    alert(data.message || 'Erro ao enviar autorização');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            } catch (error) {
+                alert('Erro na conexão. Tente novamente.');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
             }
         }
 
@@ -1826,8 +2256,9 @@
 
             try {
                 const token = localStorage.getItem('token');
-                // Usar student.schoolId que veio do endpoint my-students
-                const res = await fetch(`${API_URL}/guardian/student-attendance?schoolId=${student.schoolId}&studentId=${studentId}&month=${month}&year=${year}`, {
+                // Usar student.schoolId que veio do endpoint my-students (tratar snake_case do backend)
+                const schoolId = student.school_id || student.schoolId;
+                const res = await fetch(`${API_URL}/guardian/student-attendance?schoolId=${schoolId}&studentId=${studentId}&month=${month}&year=${year}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -1884,10 +2315,199 @@
                     div.classList.add('day-absent');
                     // Fim de semana check simples
                 }
-
                 container.appendChild(div);
             }
         }
+
+        // --- EVENTOS E NOTIFICAÇÕES DA ESCOLA ---
+        // --- EVENTOS E NOTIFICAÇÕES DA ESCOLA (REESCRITO PARA ROBUSTEZ V2) ---
+        async function loadEventsAndNotifications(silent = false) {
+            const eventsListDiv = document.getElementById('eventsList');
+            const eventsEmptyDiv = document.getElementById('eventsEmpty');
+
+            if (!eventsListDiv) {
+                console.error("❌ Elemento eventsList não encontrado no DOM!");
+                return;
+            }
+
+            console.log("🚀 Iniciando carga de eventos... Silent:", silent);
+
+            // Estado de carregamento apenas se não for silencioso
+            if (!silent) {
+                eventsListDiv.innerHTML = `
+                <div id="event-loading-state" style="text-align:center; padding:40px 20px; color:#6b7280;">
+                    <div style="display:inline-block; width:28px; height:28px; border:3px solid #f3f4f6; border-top-color:#6366f1; border-radius:50%; animation:spin 1s linear infinite; margin-bottom:12px;"></div>
+                    <p style="font-size:14px; font-weight:500;">Buscando avisos da escola...</p>
+                </div>`;
+            }
+            if (eventsEmptyDiv) eventsEmptyDiv.classList.add('hidden');
+
+            // Timeout de segurança: se em 8 segundos não carregar, mostra erro
+            const timeoutId = setTimeout(() => {
+                const loader = document.getElementById('event-loading-state');
+                if (loader) {
+                    console.warn("⚠️ O carregamento de eventos demorou demais...");
+                    eventsListDiv.innerHTML = `
+                        <div style="text-align:center; padding:30px; background:#fff1f2; border-radius:12px; border:1px solid #fecaca; color:#b91c1c;">
+                            <p style="font-weight:600;">O servidor demorou a responder.</p>
+                            <button onclick="loadEventsAndNotifications()" style="margin-top:12px; padding:10px 20px; background:#ef4444; color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer;">Tentar Novamente</button>
+                        </div>
+                    `;
+                }
+            }, 8000);
+
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    console.error("❌ Token ausente no localStorage");
+                    clearTimeout(timeoutId);
+                    showLogin();
+                    return;
+                }
+
+                console.log("📡 Chamando API de eventos...");
+                const response = await fetch(`${API_URL}/guardian/school-events`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`Servidor respondeu com status ${response.status}`);
+                }
+
+                const data = await response.json();
+                const events = data.events || [];
+                console.log(`✅ ${events.length} eventos recebidos.`);
+
+                if (events.length === 0) {
+                    eventsListDiv.innerHTML = '';
+                    eventsEmptyDiv.classList.remove('hidden');
+                    return;
+                }
+
+                // Renderização pura e direta
+                let html = '';
+                events.forEach(event => {
+                    const eventDate = event.event_date ? new Date(event.event_date + 'T12:00:00') : null;
+                    const dateDisplay = eventDate ? eventDate.toLocaleDateString('pt-BR') : 'Data pendente';
+                    const valor = event.cost ? parseFloat(event.cost) : 0;
+
+                    let typeBadge = '';
+                    if (event.type === 'trip') typeBadge = '<span style="background:#8b5cf6; color:white; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:700; text-transform:uppercase; margin-right:8px;">🚌 Passeio</span>';
+                    else if (event.type === 'warning') typeBadge = '<span style="background:#f59e0b; color:white; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:700; text-transform:uppercase; margin-right:8px;">⚠️ Aviso</span>';
+                    else typeBadge = '<span style="background:#3b82f6; color:white; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:700; text-transform:uppercase; margin-right:8px;">📅 Evento</span>';
+
+                    html += `
+                        <div class="event-card" style="background:white; border-radius:16px; padding:20px; margin-bottom:16px; border:1px solid #f3f4f6; box-shadow:0 10px 15px -3px rgba(0,0,0,0.05);">
+                            <div style="margin-bottom:8px;">${typeBadge}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+                                <h3 style="font-size:18px; font-weight:700; color:#111827; margin:0;">${event.title || 'Comunicado'}</h3>
+                                ${valor > 0 ? `<span style="background:#ecfdf5; color:#065f46; font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>` : ''}
+                            </div>
+                            <p style="font-size:14px; color:#4b5563; line-height:1.5; margin:0 0 16px 0;">${event.description || ''}</p>
+                            
+                            <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:12px; color:#6b7280; font-weight:500;">
+                                <div style="display:flex; align-items:center; gap:5px;">📅 ${dateDisplay}</div>
+                                <div style="display:flex; align-items:center; gap:5px;">🏫 ${event.school_name || 'Escola'}</div>
+                                <div style="display:flex; align-items:center; gap:5px;">📚 ${event.class_name || 'Geral'}</div>
+                            </div>
+
+                            ${event.pix_key ? `
+                                <div style="margin-top:20px; padding:15px; background:#f9fafb; border-radius:12px; border:1px dashed #d1d5db;">
+                                    <p style="font-size:12px; font-weight:700; color:#374151; margin:0 0 8px 0; text-transform:uppercase; letter-spacing:0.5px;">Chave PIX para pagamento:</p>
+                                    <div style="font-family:monospace; background:white; padding:8px; border-radius:6px; border:1px solid #e5e7eb; font-size:13px; color:#111827; word-break:break-all;">${event.pix_key}</div>
+                                    ${event.payment_deadline ? `<p style="font-size:11px; color:#ef4444; margin:8px 0 0 0; font-weight:600;">⚠️ Pagar até: ${new Date(event.payment_deadline + 'T12:00:00').toLocaleDateString('pt-BR')}</p>` : ''}
+                                </div>
+                                <div style="display:flex; gap:10px; margin-top:12px;">
+                                    <button onclick="confirmEventParticipation(${event.id}, ${event.school_id})" 
+                                            style="flex:1; background:#6366f1; color:white; border:none; padding:12px; border-radius:12px; font-weight:700; font-size:13px; cursor:pointer;">
+                                        ✅ Confirmar
+                                    </button>
+                                    <input type="file" id="receipt-${event.id}" accept="image/*,application/pdf" style="display:none" onchange="uploadReceipt(this, ${event.id}, ${event.school_id})">
+                                    <button onclick="document.getElementById('receipt-${event.id}').click()" 
+                                            style="flex:1; background:#10b981; color:white; border:none; padding:12px; border-radius:12px; font-weight:700; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
+                                        📤 Comprovante
+                                    </button>
+                                </div>
+                            ` : `
+                                <button onclick="confirmEventParticipation(${event.id}, ${event.school_id})" 
+                                        style="width:100%; margin-top:20px; background:#6366f1; color:white; border:none; padding:14px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 6px -1px rgba(99, 102, 241, 0.2);">
+                                    ✅ Estar Ciente / Participar
+                                </button>
+                            `}
+                        </div>
+                    `;
+                });
+
+                eventsListDiv.innerHTML = html;
+
+            } catch (err) {
+                clearTimeout(timeoutId);
+                console.error("❌ Erro fatal ao carregar eventos:", err);
+                eventsListDiv.innerHTML = `
+                    <div style="text-align:center; padding:30px; background:#fff; border-radius:16px; border:1px solid #e5e7eb; color:#4b5563;">
+                        <p style="font-weight:600; color:#ef4444;">Falha na conexão com a escola</p>
+                        <p style="font-size:13px; margin-top:5px;">Verifique sua internet ou tente novamente mais tarde.</p>
+                        <button onclick="loadEventsAndNotifications()" style="margin-top:15px; padding:12px 24px; background:#6366f1; color:white; border:none; border-radius:12px; font-weight:600; cursor:pointer;">Tentar Novamente</button>
+                    </div>
+                `;
+            }
+        }
+
+        async function uploadReceipt(input, eventId, schoolId) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('receipt', file);
+
+            if (!confirm('Deseja enviar este arquivo como comprovante?')) return;
+
+            try {
+                const token = localStorage.getItem('token');
+                // Reutiliza a rota de confirm, que agora aceita multipart
+                const res = await fetch(`${API_URL}/guardian/school-events/${schoolId}/${eventId}/confirm`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+
+                if (res.ok) {
+                    alert('Comprovante enviado com sucesso!');
+                    loadEventsAndNotifications();
+                } else {
+                    alert('Erro ao enviar comprovante.');
+                }
+            } catch (e) {
+                alert('Erro de conexão ao enviar.');
+                console.error(e);
+            }
+        }
+
+        async function confirmEventParticipation(eventId, schoolId) {
+            if (!confirm('Deseja confirmar a participação/leitura deste evento?')) return;
+
+            try {
+                const token = localStorage.getItem('token');
+                // Rota com schoolId para evitar ambiguidade
+                const res = await fetch(`${API_URL}/guardian/school-events/${schoolId}/${eventId}/confirm`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    alert('Confirmação registrada com sucesso!');
+                    loadEventsAndNotifications();
+                } else {
+                    alert('Erro ao registrar confirmação.');
+                }
+            } catch (e) {
+                alert('Erro de conexão ao confirmar.');
+            }
+        }
+
         // --- CHAT SYSTEM ---
         function loadChatList() {
             const list = document.getElementById('chatList');
@@ -1901,7 +2521,7 @@
 
             empty.classList.add('hidden');
             list.innerHTML = myStudentsData.map(s => `
-                <div class="chat-list-item" onclick="openChat(${s.id})">
+                    <div class="chat-list-item" onclick="openChat(${s.id})" >
                     <div class="child-avatar">
                         ${s.photo_url ? `<img src="${s.photo_url}">` : s.name.charAt(0)}
                     </div>
@@ -1910,8 +2530,8 @@
                         <div class="child-details">${s.schoolName || 'Escola'}</div>
                     </div>
                     <div style="font-size: 20px; color: #ddd;">›</div>
-                </div>
-            `).join('');
+                </div >
+                    `).join('');
         }
 
         async function openChat(studentId) {
@@ -1958,19 +2578,42 @@
         async function fetchMessages() {
             if (!activeChatStudentId) return;
             const student = myStudentsData.find(s => s.id == activeChatStudentId);
+            if (!student) return;
 
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/guardian/chat/${activeChatStudentId}/messages?schoolId=${student.schoolId}`, {
+                const schoolId = student.schoolId || student.school_id;
+                const res = await fetch(`${API_URL}/guardian/chat/${activeChatStudentId}/messages?schoolId=${schoolId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const msgs = await res.json();
+
+                if (!res.ok) {
+                    console.error('❌ Erro ao buscar mensagens:', res.status);
+                    return;
+                }
+
+                const data = await res.json();
+                console.log('📨 Mensagens recebidas:', data);
+
+                // Garantir que data é um array
+                const msgs = Array.isArray(data) ? data : [];
                 renderMessages(msgs);
-            } catch (e) { console.error(e); }
+            } catch (e) {
+                console.error('❌ Erro fetchMessages:', e);
+                renderMessages([]);
+            }
         }
 
         function renderMessages(messages) {
             const container = document.getElementById('chatMessages');
+            if (!container) return;
+
+            // Validar que messages é um array
+            if (!Array.isArray(messages)) {
+                console.error('❌ renderMessages recebeu dados inválidos:', messages);
+                messages = [];
+            }
+
             // Check if user is near bottom to auto-scroll
             const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
 
@@ -2025,10 +2668,19 @@
             if (!content && !file) return;
 
             const student = myStudentsData.find(s => s.id == activeChatStudentId);
+            if (!student) {
+                console.error('❌ Aluno não encontrado!', activeChatStudentId);
+                alert('Erro: Aluno não encontrado');
+                return;
+            }
+
+            console.log('📤 Enviando mensagem para aluno:', student.name);
+            console.log('🏫 School ID:', student.schoolId || student.school_id);
+
             const token = localStorage.getItem('token');
 
             const formData = new FormData();
-            formData.append('schoolId', student.schoolId);
+            formData.append('schoolId', student.schoolId || student.school_id);
             if (content) formData.append('content', content);
             if (file) formData.append('file', file);
             formData.append('type', type);
@@ -2039,14 +2691,27 @@
                 document.getElementById('micBtn').style.display = 'block';
                 document.getElementById('sendBtn').style.display = 'none';
 
-                await fetch(`${API_URL}/guardian/chat/${activeChatStudentId}/messages`, {
+                const url = `${API_URL}/guardian/chat/${activeChatStudentId}/messages`;
+                console.log('🌐 URL:', url);
+
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
                 });
+
+                console.log('📥 Resposta:', response.status);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Erro do servidor:', errorText);
+                    throw new Error(`Servidor retornou ${response.status}`);
+                }
+
                 fetchMessages();
             } catch (e) {
-                alert('Erro ao enviar');
+                console.error('❌ Erro ao enviar:', e);
+                alert('Erro ao enviar: ' + e.message);
             }
         }
 
@@ -2098,84 +2763,6 @@
             }
         }
 
-        async function loadEventsAndNotifications() {
-            const list = document.getElementById('eventsList');
-            const empty = document.getElementById('eventsEmpty');
-            list.innerHTML = '<div style="text-align:center; padding:20px; color:#6b7280;">Carregando...</div>';
-            empty.style.display = 'none';
-
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) return;
-
-                const res = await fetch(`${API_URL}/guardian/events`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (!res.ok) throw new Error('Falha ao buscar eventos');
-
-                const events = await res.json();
-
-                list.innerHTML = '';
-
-                if (events.length === 0) {
-                    empty.style.display = 'block';
-                    return;
-                }
-
-                events.forEach(e => {
-                    const date = new Date(e.event_date || e.created_at).toLocaleDateString('pt-BR');
-                    const cost = e.cost ? `R$ ${e.cost.toFixed(2)}` : 'Gratuito';
-                    const paymentDeadline = e.payment_deadline ? new Date(e.payment_deadline).toLocaleDateString('pt-BR') : null;
-
-                    const div = document.createElement('div');
-                    div.className = 'event-card';
-
-                    // Botões de ação
-                    let actionsHtml = '';
-
-                    // Primeiro: Tenho Interesse (roxo)
-                    actionsHtml += `<button onclick="participate(${e.id}, ${e.schoolId}, 'interested')" style="flex:1; padding:10px; border:none; color:white; background:#8b5cf6; border-radius:8px; font-weight:600; font-size:13px;">👋 Tenho Interesse</button>`;
-
-                    // Se tiver custo, mostra botão de pagamento
-                    if (e.cost > 0 || e.pix_key) {
-                        actionsHtml += `<button onclick="participate(${e.id}, ${e.schoolId}, 'inform_payment')" style="flex:1; padding:10px; border:none; color:white; background:#10b981; border-radius:8px; font-weight:600; font-size:13px;">💰 Já Paguei</button>`;
-                    }
-
-                    div.innerHTML = `
-                        <div class="event-header">
-                            <div class="event-title">${e.title}</div>
-                            <div class="event-date">📅 ${date}</div>
-                        </div>
-                        <div class="event-desc">${e.description || ''}</div>
-
-                        ${e.cost > 0 ? `<div style="background:#dcfce7; padding:10px; border-radius:8px; margin:10px 0; border:1px solid #86efac;">
-                            <div style="color:#166534; font-weight:bold; font-size:16px;">💵 Valor: ${cost}</div>
-                            ${paymentDeadline ? `<div style="color:#dc2626; font-size:13px; margin-top:4px;">⚠️ Pagar até: ${paymentDeadline}</div>` : ''}
-                        </div>` : ''}
-
-                        ${e.pix_key ? `<div style="background:#fffbeb; padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid #fcd34d;">
-                            <div style="color:#92400e; font-size:12px; font-weight:600;">CHAVE PIX PARA PAGAMENTO:</div>
-                            <div style="color:#b45309; font-size:14px; word-break:break-all; margin-top:4px; font-family:monospace;">${e.pix_key}</div>
-                        </div>` : ''}
-
-                        <div class="event-footer">
-                            <div class="event-school">🏫 ${e.school_name || 'Escola'}</div>
-                            ${e.class_name ? `<div style="background:#e0e7ff; color:#4338ca; padding:2px 8px; border-radius:4px; font-size:11px;">Turma ${e.class_name}</div>` : '<div style="background:#f0fdf4; color:#166534; padding:2px 8px; border-radius:4px; font-size:11px;">Toda Escola</div>'}
-                        </div>
-                        <div style="margin-top:12px; display:flex; gap:8px;">
-                            ${actionsHtml}
-                        </div>
-                    `;
-                    list.appendChild(div);
-                });
-
-            } catch (e) {
-                console.error(e);
-                list.innerHTML = '<div style="text-align:center; padding:20px; color:#ef4444;">Erro ao carregar avisos.</div>';
-            }
-        }
-
         async function participate(evtId, schoolId, action) {
             // Confirmação simples
             const labels = {
@@ -2208,6 +2795,114 @@
                 alert('Erro de conexão');
             }
         }
+
+        // ===== SERVER-SENT EVENTS (SSE) PARA EVENTOS EM TEMPO REAL =====
+        let eventsSSE = null;
+
+        function startEventsSSE() {
+            // Parar conexão anterior se existir
+            stopEventsSSE();
+
+            const token = localStorage.getItem('token');
+            if (!token) {
+                console.error('❌ Token não encontrado para SSE');
+                return;
+            }
+
+            console.log('🔌 Conectando SSE para eventos em tempo real...');
+
+            // Criar conexão SSE
+            eventsSSE = new EventSource(`${API_URL}/guardian/events-stream?token=${token}`);
+
+            eventsSSE.onopen = () => {
+                console.log('✅ SSE conectado! Escutando eventos da escola...');
+            };
+
+            eventsSSE.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+
+                    if (data.type === 'connected') {
+                        console.log('🔗 SSE: Conexão estabelecida');
+                    } else if (data.type === 'events') {
+                        console.log(`📨 SSE: ${data.data.length} eventos recebidos`);
+                        renderEventsFromSSE(data.data);
+                    }
+                } catch (e) {
+                    console.error('❌ Erro ao processar SSE:', e);
+                }
+            };
+
+            eventsSSE.onerror = (error) => {
+                console.error('❌ Erro na conexão SSE:', error);
+                // Tentar reconectar após 5 segundos
+                setTimeout(() => {
+                    if (document.getElementById('notificationsScreen').classList.contains('hidden') === false) {
+                        console.log('🔄 Tentando reconectar SSE...');
+                        startEventsSSE();
+                    }
+                }, 5000);
+            };
+        }
+
+        function stopEventsSSE() {
+            if (eventsSSE) {
+                console.log('🔌 Fechando conexão SSE de eventos...');
+                eventsSSE.close();
+                eventsSSE = null;
+            }
+        }
+
+        function renderEventsFromSSE(events) {
+            const eventsListDiv = document.getElementById('eventsList');
+            const eventsEmptyDiv = document.getElementById('eventsEmpty');
+
+            if (!eventsListDiv) return;
+
+            if (events.length === 0) {
+                eventsListDiv.innerHTML = '';
+                if (eventsEmptyDiv) eventsEmptyDiv.classList.remove('hidden');
+                return;
+            }
+
+            if (eventsEmptyDiv) eventsEmptyDiv.classList.add('hidden');
+
+            let html = '';
+            events.forEach(event => {
+                const eventDate = event.event_date ? new Date(event.event_date + 'T12:00:00') : null;
+                const dateDisplay = eventDate ? eventDate.toLocaleDateString('pt-BR') : 'Data pendente';
+                const valor = event.cost ? parseFloat(event.cost) : 0;
+
+                let typeBadge = '';
+                if (event.type === 'trip') typeBadge = '<span style="background:#8b5cf6; color:white; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:700; text-transform:uppercase; margin-right:8px;">🚌 Passeio</span>';
+                else if (event.type === 'warning') typeBadge = '<span style="background:#f59e0b; color:white; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:700; text-transform:uppercase; margin-right:8px;">⚠️ Aviso</span>';
+                else typeBadge = '<span style="background:#3b82f6; color:white; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:700; text-transform:uppercase; margin-right:8px;">📅 Evento</span>';
+
+                html += `
+                    <div class="event-card" style="background:white; border-radius:16px; padding:20px; margin-bottom:16px; border:1px solid #f3f4f6; box-shadow:0 10px 15px -3px rgba(0,0,0,0.05);">
+                        <div style="margin-bottom:8px;">${typeBadge}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+                            <h3 style="font-size:18px; font-weight:700; color:#111827; margin:0;">${event.title || 'Comunicado'}</h3>
+                            ${valor > 0 ? `<span style="background:#ecfdf5; color:#065f46; font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>` : ''}
+                        </div>
+                        <p style="font-size:14px; color:#4b5563; line-height:1.5; margin:0 0 16px 0;">${event.description || ''}</p>
+                        
+                        <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:12px; color:#6b7280; font-weight:500;">
+                            <div style="display:flex; align-items:center; gap:5px;">📅 ${dateDisplay}</div>
+                            <div style="display:flex; align-items:center; gap:5px;">🏫 ${event.school_name || 'Escola'}</div>
+                            <div style="display:flex; align-items:center; gap:5px;">📚 ${event.class_name || 'Geral'}</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            eventsListDiv.innerHTML = html;
+        }
+
+        // Parar SSE ao sair da página
+        window.addEventListener('beforeunload', () => {
+            stopEventsSSE();
+        });
     </script>
 </body>
 

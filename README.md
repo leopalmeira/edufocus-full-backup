@@ -3,38 +3,37 @@
 > **Transformando câmeras de segurança em ferramentas de gestão pedagógica e engajamento escolar.**
 
 [![Status](https://img.shields.io/badge/status-production-success)](https://github.com/leopalmeira/edufocus1)
+[![Python](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org/)
 [![Node](https://img.shields.io/badge/node-18.x-green)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/react-18.3-blue)](https://reactjs.org/)
 [![AI](https://img.shields.io/badge/AI-TensorFlow.js-orange)](https://www.tensorflow.org/js)
-[![WhatsApp](https://img.shields.io/badge/WhatsApp-Baileys-25D366)](https://github.com/WhiskeySockets/Baileys)
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/leopalmeira/UNICO)
+[![Portaria](https://img.shields.io/badge/Portaria-Geolocalização-blueviolet)](./DOC_PORTARIA_GEO.md)
 
 ---
 
 ## 📖 O Que é o EduFocus na Prática?
 
-O **EduFocus** não é apenas um sistema de gestão escolar. É uma plataforma de **Inteligência Artificial aplicada** que resolve três dores críticas das instituições de ensino modernas: **Segurança, Comunicação e Engajamento.**
+O **EduFocus** não é apenas um sistema de gestão escolar. É uma plataforma de **Inteligência Artificial aplicada** que resolve três dores críticas das instituições de ensino modernas: **Segurança, Controle de Acesso e Saída Estruturada.**
 
 Diferente de sistemas passivos, o EduFocus age ativamente:
-1.  **Segurança Ativa:** Identifica quem entra e sai da escola em milissegundos.
-2.  **Comunicação Imediata:** Avisa os pais *no momento exato* que o aluno pisa na escola, com foto, via WhatsApp (onde eles realmente olham).
-3.  **Pedagogia Baseada em Dados:** Analisa se os alunos estão felizes, atentos ou entediados durante a aula, sem interromper o professor.
+1.  **Segurança Ativa:** Identifica quem entra e sai da escola em milissegundos através de reconhecimento facial.
+2.  **Portaria Inteligente (GEO):** Notifica a equipe de portaria no exato momento em que o responsável entra em um raio de 500m da escola.
+3.  **Pedagogia Baseada em Dados:** Analisa o engajamento e o clima emocional das turmas em tempo real.
 
-Tudo isso rodando em uma arquitetura **Multi-tenant robusta**, permitindo que uma única instalação gerencie dezenas de escolas com total isolamento de dados.
+Tudo isso rodando em uma arquitetura **Multi-tenant robusta**, permitindo o isolamento total de dados entre diferentes unidades escolares.
 
 ---
 
 ## 💡 Casos de Uso Reais
 
-### 👪 Para os Pais: "Paz de Espírito Instantânea"
-> *"Será que meu filho chegou bem?"* 
-O sistema elimina essa dúvida. No momento em que o aluno passa pela catraca ou porta, a câmera reconhece o rosto, e o pai recebe uma mensagem no WhatsApp:
-> **"✅ Olá! O aluno Pedro Silva acabou de chegar na Escola Modelo às 07:05. [Ver Foto]"**
+### 👪 Para os Pais: "Saída sem Filas e com Segurança"
+O responsável não precisa mais esperar em filas duplas ou sair do carro desnecessariamente. Ao se aproximar da escola, o PWA detecta sua posição e permite notificar a portaria:
+> **"🚗 Notificar Escola: Estou a 300m e pronto para retirar o Pedro Silva."**
 
 ### 🏫 Para a Direção: "Visão de Raio-X da Escola"
 O diretor não precisa adivinhar como está o clima escolar. O dashboard mostra em tempo real:
 - **Frequência:** 95% dos alunos presentes hoje.
-- **Clima Emocional:** A turma 301B está "Triste/Cansada" hoje? Talvez seja hora de uma intervenção pedagógica.
+- **Portaria:** Fluxo de saída organizado e sem aglomerações.
 - **Segurança:** Alerta imediato de pessoas não autorizadas.
 
 ### 👩‍🏫 Para Professores: "Foco no Ensino, Não na Chamada"
@@ -57,17 +56,15 @@ Utilizamos **TensorFlow.js** e **face-api.js** rodando diretamente no navegador 
 *   **Custo Zero:** Não há cobrança por API de reconhecimento facial.
 *   **Performance:** Latência mínima, feedback visual em tempo real (< 100ms).
 
-### 2. Motor de Comunicação WhatsApp (Baileys)
-Em vez de pagar centavos de dólar por mensagem na API oficial (o que inviabilizaria o projeto para escolas públicas), utilizamos a biblioteca **Baileys**.
-*   **Simulação Real:** O sistema se comporta como um WhatsApp Web real.
-*   **Sessões Persistentes:** As sessões de cada escola são salvas em arquivos locais (`auth_info_baileys`), permitindo reinicializações sem perder a conexão.
-*   **Filas de Envio:** Sistema inteligente de filas para evitar bloqueios por spam.
+### 2. Sistema de Portaria por Geolocalização
+Integramos a Geolocation API nativa para um sistema de "Check-in" de proximidade.
+*   **Distância Real:** Cálculo de Haversine entre o responsável e a unidade escolar.
+*   **Real-time:** O painel do inspetor de portaria atualiza via polling/SSE (Server-Sent Events) para exibir quem está chegando.
 
 ### 3. Multi-tenancy Real (Isolamento Lógico e Físico)
 Para garantir que dados da "Escola A" nunca vazem para a "Escola B":
-*   **Banks Isolados:** Cada escola tem seu próprio arquivo SQLite (`school_1.db`, `school_2.db`). Isso facilita backups individuais e migrações.
-*   **Banco Sistema:** Um banco global (`system.db`) gerencia apenas as credenciais de super admins e a lista de escolas.
-*   **Roteamento Dinâmico:** O Middleware `getSchoolDB(id)` conecta automaticamente ao banco correto baseado no token do usuário logado.
+*   **Bancos Isolados:** Cada escola tem seu próprio arquivo SQLite (`school_1.db`, `school_2.db`).
+*   **Banco Sistema:** Um banco global (`system.db`) gerencia credenciais e metadados das escolas.
 
 ---
 
@@ -75,24 +72,52 @@ Para garantir que dados da "Escola A" nunca vazem para a "Escola B":
 
 ```mermaid
 graph TD
-    User[Usuário/Câmera] -->|HTTPS| Frontend[React Client + AI Models]
-    Frontend -->|Detecção Facial| AI[TensorFlow.js]
-    AI -->|Face ID + Emoção| Frontend
-    Frontend -->|JSON Data| API[Node.js Express API]
-    
-    subgraph Backend Server
-        API -->|Auth| SystemDB[(System.db)]
-        API -->|Dados Escolares| Router{School Router}
-        Router -->|Escola 1| DB1[(School_1.db)]
-        Router -->|Escola 2| DB2[(School_2.db)]
+    %% Estilos
+    classDef client fill:#3b82f6,stroke:#1d4ed8,color:#fff
+    classDef server fill:#10b981,stroke:#047857,color:#fff
+    classDef database fill:#f59e0b,stroke:#b45309,color:#fff
+    classDef feature fill:#8b5cf6,stroke:#6d28d9,color:#fff
+
+    subgraph Dispositivos [Camada de Cliente]
+        Parent[PWA do Responsável]:::client
+        Admin[Painel Administrativo React]:::client
+        Cam[Câmera IP / Webcam]:::client
+        AI[Edge AI: face-api.js]:::feature
         
-        API -->|Notificação| WA[WhatsApp Service]
-        WA -->|Sessão 1| WA1[Baileys Session 1]
-        WA -->|Sessão 2| WA2[Baileys Session 2]
+        Admin <--> AI
+        Cam --> Admin
     end
+
+    subgraph Servidor [Backend Python Flask]
+        API[Flask REST API]:::server
+        Middleware[Auth & Tenant Router]:::server
+        Logic[Lógica de Negócio / Portaria]:::server
+        
+        API --- Middleware
+        Middleware --- Logic
+    end
+
+    subgraph Dados [Persistência Multi-tenant]
+        SystemDB[(system.db)]:::database
+        SchoolDBs{Roteador de Bancos}:::database
+        DB1[(school_1.db)]:::database
+        DB2[(school_2.db)]:::database
+        
+        Logic --> SystemDB
+        Logic --> SchoolDBs
+        SchoolDBs --> DB1
+        SchoolDBs --> DB2
+    end
+
+    %% Fluxos de Interação
+    Parent -->|GPS Check-in| API
+    Admin -->|HTTPS / JSON| API
+    Logic -->|Real-time Update| Admin
     
-    WA1 -->|Internet| WhatsAppCloud[WhatsApp Network]
-    WhatsAppCloud -->|Mensagem| Parents[Celular dos Pais]
+    %% Legenda de Fluxos
+    Logic -.->|Notifica Inspetor| Admin
+    Admin -.->|Libera Aluno| Logic
+    Logic -.->|Status da Retirada| Parent
 ```
 
 ---
@@ -120,20 +145,31 @@ graph TD
 **Tecnologia:** face-api.js + TensorFlow.js
 
 **Funcionalidades:**
-- Detecção de rostos em tempo real via webcam
-- Reconhecimento de alunos cadastrados (precisão >95%)
-- Registro automático de presença (entrada/saída)
-- Prevenção de duplicatas (mesmo aluno no mesmo dia)
-- Captura e armazenamento de fotos em base64
+- Detecção de rostos em tempo real via webcam.
+- Reconhecimento de alunos cadastrados (precisão >95%).
+- Registro automático de presença (entrada/saída).
+- Prevenção de duplicatas (mesmo aluno no mesmo dia).
+- Captura e armazenamento de fotos em base64.
 
 **Fluxo:**
 1. Professor ativa câmera na sala
+   ↓
 2. Sistema detecta rostos continuamente
+   ↓
 3. Compara com banco de dados de alunos
+   ↓
 4. Registra presença automaticamente
-5. Envia notificação WhatsApp para responsável
 
-### 2. 😊 Análise de Emoções em Tempo Real
+### 2. 🎯 Portaria e Retirada por Geolocalização
+**O fim das filas duplas e da aglomeração no portão.**
+
+- **Monitoramento de Proximidade:** O Web App (PWA) do responsável monitora a distância em relação à escola.
+- **Check-in Automático:** Ao entrar no raio de **500 metros**, o botão "Estou no Portão" é liberado.
+- **Painel do Inspetor:** Um dashboard exclusivo para os porteiros que lista os alunos em ordem de chegada dos pais.
+- **Fluxo de Status:** O inspetor gerencia a fila entre 'Aguardando', 'Chamando' e 'Finalizado', registrando o log exato da entrega do aluno.
+- **Cadastro de Inspetores:** A escola pode criar usuários com perfil restrito apenas para gestão de saída.
+
+### 3. 😊 Análise de Emoções em Tempo Real
 
 **Tecnologia:** face-api.js Emotion Recognition Model
 
@@ -152,47 +188,20 @@ graph TD
 - Métricas de satisfação por turma
 - Alertas para professores
 
-### 3. 📱 Notificações WhatsApp Automatizadas
-
-**Tecnologia:** Baileys (WhatsApp Web API)
-
-**Funcionalidades:**
-- Conexão multi-tenant (uma por escola)
-- Envio de cards visuais personalizados
-- Notificações de chegada/saída
-- Mensagens de professores para responsáveis
-- Persistência de sessão
-
-**Card Visual (320x120px):**
-```
-┌────────────────────────────────────┐
-│ [FOTO] NOME DO ALUNO        ✓CHEGOU│
-│        🎓 Nome da Escola           │
-│        📚 Turma  🕐 Horário        │
-└────────────────────────────────────┘
-```
-
-**Especificações do Card:**
-- Dimensões: 320x120 pixels
-- Formato: PNG com fundo gradiente
-- Foto do aluno: 63x63px (redonda)
-- Informações: Nome, Escola, Turma, Horário
-- Badge: Status de chegada
-
-### 4. 👥 Gestão Multi-tenant
+### 4. 👥 Gestão Multi-tenant e Níveis de Acesso
 
 **Arquitetura:**
 - Banco de dados separado por escola
 - Isolamento completo de dados
 - Autenticação por escola
-- Sessões WhatsApp independentes
 
 **Níveis de Acesso:**
-1. **Super Admin** - Gestão global da plataforma
-2. **School Admin** - Gestão da escola
-3. **Teacher** - Gestão de turmas
-4. **Technician** - Instalação de câmeras
-5. **Representative** - Vendas e comissões
+1. **Super Admin** - Gestão global da plataforma.
+2. **School Admin** - Gestão da escola e configurações de portaria.
+3. **Teacher** - Gestão de turmas e chamadas presenciais.
+4. **Inspector** - Fila de retirada e liberação de alunos no portão.
+5. **Technician** - Instalação e manutenção de câmeras.
+6. **Representative** - Vendas e comissões.
 
 ### 5. 📹 Sistema de Câmeras Dual
 
@@ -206,7 +215,6 @@ graph TD
 - **Ações:**
   - Reconhece alunos cadastrados
   - Registra presença automaticamente
-  - Envia notificação WhatsApp com card visual
   - Previne duplicatas (mesmo dia)
 
 #### 🎥 Câmera de Monitoramento (Análise de Emoções)
@@ -234,7 +242,7 @@ graph TD
 - **Apenas 1 registro por dia** por funcionário (entrada pela manhã)
 - Calendário mensal de frequência
 - Relatórios exportáveis em CSV
-- **SEM notificação WhatsApp** (diferente do sistema de alunos)
+- **SEM notificação** (diferente do sistema de alunos)
 
 **Componentes:**
 
@@ -260,7 +268,7 @@ graph TD
 
 **Diferenças do Sistema de Alunos:**
 - ✅ Apenas 1 registro por dia (não separa entrada/saída)
-- ✅ Não envia notificações WhatsApp
+- ✅ Não envia notificações
 - ✅ Foco em controle de ponto trabalhista
 - ✅ Calendário de frequência mensal
 
@@ -338,22 +346,6 @@ graph TD
 - Foto cadastrada (base64)
 - Não existe registro de entrada no mesmo dia
 - Similaridade facial > 0.6 (60%)
-
-### RN004 - Notificações WhatsApp
-
-**Regra:** Notificações só são enviadas se WhatsApp estiver conectado e aluno tiver telefone cadastrado.
-
-**Implementação:**
-- Verificação de conexão antes do envio
-- Validação de número de telefone (formato brasileiro)
-- Geração de card visual com foto do aluno
-- Fallback para mensagem de texto em caso de erro
-
-**Validações:**
-- WhatsApp conectado (`isConnected = true`)
-- Telefone cadastrado e válido
-- Foto do aluno disponível (para card visual)
-- Número no formato: 55 + DDD + número
 
 ### RN005 - Gestão de Turmas
 
@@ -441,67 +433,36 @@ graph TD
 
 ---
 
-## 🚀 Instalação e Configuração
+## 🚀 Instalação e Configuração (Backend Python)
 
 ### Pré-requisitos
-
 ```bash
+Python >= 3.9
 Node.js >= 18.x
-npm >= 9.x
-Git
 ```
 
 ### Instalação
-
 ```bash
 # Clone o repositório
 git clone https://github.com/leopalmeira/edufocus1.git
 cd edufocus1
 
-# Instale dependências do servidor
-cd server
-npm install
+# Instale dependências do servidor Python
+cd server_python
+pip install -r requirements.txt
 
-# Instale dependências do cliente
+# Instale dependências do frontend
 cd ../client
 npm install
 ```
 
-### Configuração
-
-1. **Variáveis de Ambiente** (opcional)
-
-```bash
-# server/.env
-PORT=5000
-JWT_SECRET=seu_secret_aqui
-NODE_ENV=production
-```
-
-2. **Inicialização do Banco de Dados**
-
-O sistema cria automaticamente:
-- `system.db` - Banco principal (usuários, escolas)
-- `school_{id}.db` - Banco por escola (alunos, turmas, etc.)
-
 ### Execução
-
 ```bash
-# Desenvolvimento
+# Servidor Python
+python app.py
+
+# Frontend React
 npm run dev
-
-# Produção
-npm start
-```
-
-### Acesso Padrão
-
-```
-Super Admin:
-- Email: admin@edufocus.com
-- Senha: admin123
-
-URL: http://localhost:5000
 ```
 
 ---
@@ -510,7 +471,7 @@ URL: http://localhost:5000
 
 ```
 edufocus1/
-├── client/                      # Frontend React
+├── client/                      # Frontend React (Vite)
 │   ├── public/
 │   │   ├── models/             # Modelos TensorFlow.js
 │   │   │   ├── face_recognition_model/
@@ -520,7 +481,6 @@ edufocus1/
 │   ├── src/
 │   │   ├── components/         # Componentes React
 │   │   │   ├── FacialRecognitionCamera.jsx
-│   │   │   ├── WhatsAppPanel.jsx
 │   │   │   ├── AttendancePanel.jsx
 │   │   │   └── ...
 │   │   ├── pages/             # Páginas principais
@@ -535,22 +495,26 @@ edufocus1/
 │   ├── package.json
 │   └── vite.config.js
 │
-├── server/                     # Backend Node.js
+├── server_python/               # Backend Flask + SQLite
 │   ├── databases/             # Bancos SQLite
 │   │   ├── system.db
 │   │   └── school_*.db
-│   ├── whatsapp-auth/         # Sessões WhatsApp
-│   │   └── school-*/
-│   ├── server.js              # Servidor principal
-│   ├── whatsapp-service.js    # Serviço WhatsApp
-│   ├── card-generator.js      # Gerador de cards
-│   ├── seed.js                # Dados iniciais
-│   └── package.json
+│   ├── app.py                 # Servidor principal Flask
+│   ├── seed.py                # Dados iniciais
+│   └── requirements.txt
+│
+├── guardian-web-pwa/            # App do Responsável (PWA)
+│   ├── public/
+│   ├── src/
+│   ├── package.json
+│   └── vite.config.js
 │
 ├── docs/                       # Documentação
 │   ├── INSTALACAO.md
 │   ├── API.md
-│   └── FLUXO_WHATSAPP.md
+│   ├── SISTEMA_CAMERAS.md
+│   ├── SISTEMA_PONTO_FUNCIONARIOS.md
+│   └── DOC_PORTARIA_GEO.md     # Documentação do Novo Sistema de Portaria
 │
 └── README.md
 ```
@@ -559,7 +523,7 @@ edufocus1/
 
 ## 🔄 Fluxos do Sistema
 
-### Fluxo 1: Registro de Presença com WhatsApp
+### Fluxo 1: Registro de Presença
 
 ```
 1. Professor ativa câmera na sala
@@ -571,28 +535,22 @@ edufocus1/
 4. Verifica se aluno já registrou presença hoje
    ↓
 5. Registra presença no banco de dados
-   ↓
-6. Gera card visual (320x120px) com foto
-   ↓
-7. Envia card via WhatsApp para responsável
-   ↓
-8. Responsável recebe notificação
 ```
 
-### Fluxo 2: Conexão WhatsApp
+### Fluxo 2: Retirada de Alunos por Geolocalização
 
 ```
-1. School Admin acessa painel WhatsApp
+1. Responsável abre PWA no celular
    ↓
-2. Clica em "Conectar WhatsApp"
+2. PWA detecta geolocalização do responsável
    ↓
-3. Sistema gera QR Code (Baileys)
+3. Se próximo à escola, botão "Estou Aqui" é ativado
    ↓
-4. Admin escaneia QR Code no celular
+4. Responsável clica em "Estou Aqui"
    ↓
-5. Sessão é salva localmente
+5. Notificação enviada ao painel do Inspetor
    ↓
-6. WhatsApp conectado e pronto para enviar
+6. Inspetor visualiza solicitação e libera aluno
 ```
 
 ### Fluxo 3: Análise de Emoções
@@ -646,41 +604,42 @@ Content-Type: application/json
 
 Response: {
   "success": true,
-  "message": "Presença registrada e notificação enviada"
+  "message": "Presença registrada"
 }
 ```
 
-### WhatsApp
+### Portaria (Geolocalização)
 
 ```http
-GET /api/whatsapp/status
+POST /api/portaria/notify-arrival
 Authorization: Bearer {token}
+Content-Type: application/json
 
-Response: {
-  "connected": true,
-  "message": "WhatsApp conectado",
-  "qrCode": null
+{
+  "guardian_id": 1,
+  "school_id": 1,
+  "latitude": -23.5505,
+  "longitude": -46.6333
 }
-```
-
-```http
-POST /api/whatsapp/connect
-Authorization: Bearer {token}
 
 Response: {
   "success": true,
-  "message": "Conexão iniciada. Escaneie o QR Code."
+  "message": "Notificação de chegada enviada para a portaria."
 }
 ```
 
 ```http
-POST /api/whatsapp/disconnect
+GET /api/portaria/queue
 Authorization: Bearer {token}
 
-Response: {
-  "success": true,
-  "message": "WhatsApp desconectado com sucesso"
-}
+Response: [
+  {
+    "guardian_name": "Maria Silva",
+    "student_name": "Pedro Silva",
+    "status": "Aguardando",
+    "timestamp": "2023-10-27T10:00:00Z"
+  }
+]
 ```
 
 ### Alunos
@@ -725,12 +684,6 @@ Response: [
 - **Tokens JWT** - Stateless e seguros
 - **Isolamento de banco** - Cada escola tem seu próprio DB
 - **Validação de entrada** - Sanitização de dados
-
-### WhatsApp
-
-- **Sessões criptografadas** - Armazenadas localmente
-- **Multi-tenant** - Uma sessão por escola
-- **Reconexão automática** - Em caso de desconexão
 
 ---
 

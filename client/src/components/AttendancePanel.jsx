@@ -73,15 +73,17 @@ export default function AttendancePanel({ schoolId = 1 }) {
             const res = await api.get(`/school/${schoolId}/attendance?startDate=${today}&endDate=${today}`);
 
             // ✅ Backend já filtra apenas entradas (type = 'entry')
-            let entries = res.data;
+            let entries = Array.isArray(res.data) ? res.data : [];
 
             // Filter by class if selected
             if (selectedClass !== 'all') {
                 entries = entries.filter(e => e.class_name === selectedClass);
             }
 
-            // Sort by most recent
-            entries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            // Sort by most recent (garantir que é array antes de sort)
+            if (entries.length > 0) {
+                entries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            }
 
             // ✅ FILTRO DE SEGURANÇA: Garantir apenas UMA entrada por aluno
             // Mesmo que o backend retorne duplicatas, filtramos aqui

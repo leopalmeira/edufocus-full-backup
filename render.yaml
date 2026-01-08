@@ -1,12 +1,17 @@
 services:
   - type: web
-    name: edufocus-system
-    env: node
+    name: edufocus-python-backend
+    runtime: python
     plan: free
-    buildCommand: bash build.sh
-    startCommand: node server/server.js
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    rootDir: server_python
     envVars:
-      - key: NODE_ENV
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: FLASK_ENV
         value: production
-      - key: NODE_VERSION
-        value: 20.x
+      - key: SECRET_KEY
+        generateValue: true
+    healthCheckPath: /api/health

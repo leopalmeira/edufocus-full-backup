@@ -477,6 +477,80 @@
             margin-top: 4px;
         }
 
+        /* Cards de Eventos */
+        .event-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .event-title {
+            font-weight: 700;
+            font-size: 16px;
+            color: #111827;
+            margin: 0;
+        }
+
+        .badge-cost {
+            background: #ecfdf5;
+            color: #059669;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .event-desc {
+            color: #4b5563;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 12px;
+        }
+
+        .event-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 12px;
+        }
+
+        .event-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .event-footer {
+            border-top: 1px solid #f3f4f6;
+            padding-top: 8px;
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .pix-box {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 12px;
+            font-size: 13px;
+            color: #92400e;
+        }
+
+        /* ... outros estilos ... */
         .chat-input-bar {
             position: fixed;
             bottom: 0;
@@ -791,6 +865,7 @@
                         <input type="text" id="studentInput" class="input" placeholder="Digite o nome..."
                             oninput="searchStudent()">
                     </div>
+                    <div id="studentResults"></div>
                 </div>
 
                 <div id="step4" class="hidden">
@@ -1100,6 +1175,17 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
+                // Se token inválido, forçar re-login
+                if (res.status === 401 || res.status === 403) {
+                    console.log('🔒 Token inválido detectado, forçando re-login...');
+                    stopNotificationPoller();
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    user = null;
+                    showLogin();
+                    return;
+                }
+
                 if (!res.ok) return;
 
                 const data = await res.json();
@@ -1395,7 +1481,6 @@
         async function markAsRead(notificationId) {
             try {
                 const token = localStorage.getItem('token');
-                // Correção: URL sem espaços extras
                 await fetch(`${API_URL}/guardian/notifications/${notificationId}/read`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -1404,54 +1489,54 @@
         }
 
         function navigate(page) {
-            const screens = ['loginScreen', 'registerScreen', 'homeScreen', 'linkScreen', 'reportsScreen', 'notificationsScreen', 'messagesScreen', 'settingsScreen'];
-            screens.forEach(id => document.getElementById(id).classList.add('hidden'));
+            // Ocultar todas as telas
+            const screens = ['loginScreen', 'registerScreen', 'homeScreen', 'linkScreen', 'reportsScreen', 'notificationsScreen', 'messagesScreen', 'settingsScreen', 'chatScreen'];
+            screens.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            });
 
+            // Gerenciar menu inferior
+            const bottomNav = document.getElementById('bottomNav');
             const navItems = document.querySelectorAll('.nav-item');
             navItems.forEach(item => item.classList.remove('active'));
 
-            const bottomNav = document.getElementById('bottomNav');
-
-            switch (page) {
-                case 'home':
-                    document.getElementById('homeScreen').classList.remove('hidden');
-                    bottomNav.classList.remove('hidden');
-                    navItems[0].classList.add('active');
-                    loadChildren();
-                    break;
-                case 'reports':
-                    document.getElementById('reportsScreen').classList.remove('hidden');
-                    bottomNav.classList.remove('hidden');
-                    navItems[1].classList.add('active');
-                    loadReportScreen();
-                    break;
-                case 'notifications':
-                    document.getElementById('notificationsScreen').classList.remove('hidden');
-                    bottomNav.classList.remove('hidden');
-                    navItems[2].classList.add('active');
-                    loadEventsAndNotifications();
-                    break;
-                case 'messages':
-                    document.getElementById('messagesScreen').classList.remove('hidden');
-                    bottomNav.classList.remove('hidden');
-                    navItems[3].classList.add('active');
-                    loadChatList();
-                    break;
-                case 'settings':
-                    document.getElementById('settingsScreen').classList.remove('hidden');
-                    bottomNav.classList.remove('hidden');
-                    navItems[4].classList.add('active');
-                    if (user) {
-                        document.getElementById('settingsName').value = user.name;
-                        document.getElementById('settingsEmail').value = user.email;
-                        document.getElementById('settingsPhone').value = user.phone || '';
-                    }
-                    break;
-                case 'link':
-                    document.getElementById('linkScreen').classList.remove('hidden');
-                    bottomNav.classList.add('hidden');
-                    resetLink();
-                    break;
+            // Navegação
+            if (page === 'home') {
+                document.getElementById('homeScreen').classList.remove('hidden');
+                bottomNav.classList.remove('hidden');
+                navItems[0].classList.add('active');
+                loadChildren();
+            }
+            else if (page === 'reports') {
+                document.getElementById('reportsScreen').classList.remove('hidden');
+                bottomNav.classList.remove('hidden');
+                navItems[1].classList.add('active');
+                loadReportScreen();
+            }
+            else if (page === 'notifications') {
+                document.getElementById('notificationsScreen').classList.remove('hidden');
+                bottomNav.classList.remove('hidden');
+                navItems[2].classList.add('active');
+                console.log('📌 Navegando para Eventos...');
+                loadEventsAndNotifications(); // Chamada crítica
+            }
+            else if (page === 'messages') {
+                document.getElementById('messagesScreen').classList.remove('hidden');
+                bottomNav.classList.remove('hidden');
+                navItems[3].classList.add('active');
+                loadChatList();
+            }
+            else if (page === 'settings') {
+                document.getElementById('settingsScreen').classList.remove('hidden');
+                bottomNav.classList.remove('hidden');
+                navItems[4].classList.add('active');
+                if (typeof loadSettings === 'function') loadSettings();
+            }
+            else if (page === 'link') {
+                document.getElementById('linkScreen').classList.remove('hidden');
+                bottomNav.classList.add('hidden');
+                if (typeof resetLink === 'function') resetLink();
             }
         }
 
@@ -1575,44 +1660,56 @@
         let studentTimeout;
         async function searchStudent() {
             const query = document.getElementById('studentInput').value.trim();
+            const resultsDiv = document.getElementById('studentResults');
 
-            if (query.length < 3) return;
+            if (query.length < 2) {
+                if (resultsDiv) resultsDiv.innerHTML = '';
+                return;
+            }
 
             clearTimeout(studentTimeout);
             studentTimeout = setTimeout(async () => {
                 try {
-                    const token = localStorage.getItem('token');
-                    // Busca aluno específico na turma selecionada
+                    // Busca aluno na turma selecionada (endpoint público)
                     const url = `${API_URL}/guardian/schools/${selectedSchool.id}/students/search?name=${encodeURIComponent(query)}&className=${encodeURIComponent(selectedClass)}`;
-                    const res = await fetch(url, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-
-                    // O servidor retorna array de alunos encontrados
+                    const res = await fetch(url);
                     const students = await res.json();
 
-                    if (students.length > 0) {
-                        selectedStudent = students[0];
+                    if (!resultsDiv) return;
 
-                        document.getElementById('step3').classList.add('hidden');
-                        document.getElementById('step4').classList.remove('hidden');
-                        updateStep(4);
-
-                        const photoDiv = document.getElementById('previewPhoto');
-                        if (selectedStudent.photo_url) {
-                            photoDiv.innerHTML = `<img src="${selectedStudent.photo_url}">`;
-                        } else {
-                            photoDiv.textContent = selectedStudent.name.charAt(0).toUpperCase();
-                        }
-
-                        document.getElementById('previewName').textContent = selectedStudent.name;
-                        document.getElementById('previewDetails').textContent = `${selectedClass} • ${selectedSchool.name}`;
+                    if (students.length === 0) {
+                        resultsDiv.innerHTML = '<div class="result-item" style="color: #999;">Nenhum aluno encontrado</div>';
+                    } else {
+                        resultsDiv.innerHTML = students.map(s => `
+                            <div class="result-item" onclick="selectStudent(${JSON.stringify(s).replace(/"/g, '&quot;')})">
+                                👤 ${s.name}
+                            </div>
+                        `).join('');
                     }
                 } catch (error) {
-                    console.error('Erro:', error);
+                    console.error('Erro na busca:', error);
                 }
-            }, 800);
+            }, 300);
         }
+
+        function selectStudent(student) {
+            selectedStudent = student;
+
+            document.getElementById('step3').classList.add('hidden');
+            document.getElementById('step4').classList.remove('hidden');
+            updateStep(4);
+
+            const photoDiv = document.getElementById('previewPhoto');
+            if (selectedStudent.photo_url) {
+                photoDiv.innerHTML = `<img src="${selectedStudent.photo_url}">`;
+            } else {
+                photoDiv.textContent = selectedStudent.name.charAt(0).toUpperCase();
+            }
+
+            document.getElementById('previewName').textContent = selectedStudent.name;
+            document.getElementById('previewDetails').textContent = `${selectedClass} • ${selectedSchool.name}`;
+        }
+
 
         async function confirmLink() {
             const errorDiv = document.getElementById('linkError');
@@ -1620,9 +1717,19 @@
             errorDiv.classList.add('hidden');
             successDiv.classList.add('hidden');
 
-            try {
-                const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token');
 
+            // Verificar se está logado
+            if (!token || !user) {
+                errorDiv.textContent = '❌ Você precisa fazer login primeiro para vincular um filho.';
+                errorDiv.classList.remove('hidden');
+                setTimeout(() => {
+                    showLogin();
+                }, 2000);
+                return;
+            }
+
+            try {
                 const res = await fetch(`${API_URL}/guardian/link-student`, {
                     method: 'POST',
                     headers: {
@@ -1638,10 +1745,22 @@
                 const data = await res.json();
 
                 if (!res.ok) {
+                    if (res.status === 401 || res.status === 403) {
+                        // Token inválido - limpar e forçar re-login
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                        user = null;
+                        errorDiv.textContent = '❌ Sessão expirada. Redirecionando para login...';
+                        errorDiv.classList.remove('hidden');
+                        setTimeout(() => {
+                            showLogin();
+                        }, 1500);
+                        return;
+                    }
                     throw new Error(data.message || 'Erro ao vincular');
                 }
 
-                successDiv.textContent = `✅ ${selectedStudent.name} vinculado!`;
+                successDiv.textContent = `✅ ${selectedStudent.name} vinculado com sucesso!`;
                 successDiv.classList.remove('hidden');
 
                 setTimeout(() => {
@@ -1652,6 +1771,7 @@
                 errorDiv.classList.remove('hidden');
             }
         }
+
 
         async function register() {
             const name = document.getElementById('regName').value.trim();
@@ -1749,13 +1869,12 @@
             const div = document.getElementById('childrenList');
 
             try {
-                const res = await fetch(`${API_URL}/guardian/my-students`, {
+                const res = await fetch(`${API_URL}/guardian/students`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
                 const data = await res.json();
-                // O servidor retorna um array diretamente (não em data.data.students)
-                const children = Array.isArray(data) ? data : (data.data?.students || []);
+                const children = data.data?.students || [];
                 myStudentsData = children;
 
                 if (user) {
@@ -1773,19 +1892,254 @@
                     return;
                 }
 
-                div.innerHTML = children.map(child => `
-                    <div class="child-card">
-                        <div class="child-avatar">
-                            ${child.photo_url ? `<img src="${child.photo_url}">` : child.name.charAt(0).toUpperCase()}
+                div.innerHTML = children.map(child => {
+                    const hasCoords = child.latitude && child.longitude;
+                    return `
+                        <div class="child-card" style="flex-direction: column; align-items: stretch; gap: 16px; padding: 16px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div class="child-avatar">
+                                    ${child.photo_url ? `<img src="${child.photo_url}">` : child.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div class="child-info">
+                                    <div class="child-name">${child.name}</div>
+                                    <div class="child-details">${child.class_name || 'Sem turma'} • ${child.school_name || ''}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="pickup-container-${child.id}" style="margin-top: 4px;">
+                                <div id="dist-info-${child.id}" style="font-size: 12px; color: #6b7280; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                                    ${hasCoords ? '<span>📍 Calculando distância...</span>' : '<span style="color: #9ca3af;">📍 Localização da escola não configurada</span>'}
+                                </div>
+                                
+                                <!-- Botão principal: só ativo quando próximo da escola -->
+                                <button id="pickup-btn-${child.id}" 
+                                        class="btn-primary" 
+                                        style="width: 100%; background: #94a3b8; font-size: 14px; padding: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; opacity: 0.6; cursor: not-allowed;"
+                                        onclick="requestPickup(${child.id}, ${child.school_id})"
+                                        disabled>
+                                    🚗 Aguardando aproximação...
+                                </button>
+                                
+                                <!-- Botão secundário: autorizar de longe (outra pessoa buscar) -->
+                                <button id="remote-btn-${child.id}" 
+                                        class="btn-secondary" 
+                                        style="width: 100%; margin-top: 8px; font-size: 13px; padding: 12px; display: none; align-items: center; justify-content: center; gap: 8px; background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);"
+                                        onclick="requestRemotePickup(${child.id}, ${child.school_id}, '${child.name.replace(/'/g, "\\'")}')">
+                                    ⚠️ Autorizar de Longe (Outra Pessoa Buscar)
+                                </button>
+                            </div>
                         </div>
-                        <div class="child-info">
-                            <div class="child-name">${child.name}</div>
-                            <div class="child-details">${child.class_name || 'Sem turma'} • ${child.schoolName || child.school_name || ''}</div>
-                        </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
+
+                // Iniciar monitoramento de distância se houver coordenadas
+                children.forEach(child => {
+                    if (child.latitude && child.longitude) {
+                        startDistanceTracking(child);
+                    }
+                });
+
             } catch (error) {
                 console.error('Erro:', error);
+            }
+        }
+
+        const distanceTrackers = {};
+
+        function startDistanceTracking(child) {
+            if (distanceTrackers[child.id]) clearInterval(distanceTrackers[child.id]);
+
+            const track = () => {
+                if (!navigator.geolocation) return;
+
+                navigator.geolocation.getCurrentPosition(position => {
+                    const dist = calculateDistance(
+                        position.coords.latitude,
+                        position.coords.longitude,
+                        child.latitude,
+                        child.longitude
+                    );
+
+                    const infoDiv = document.getElementById(`dist-info-${child.id}`);
+                    const btn = document.getElementById(`pickup-btn-${child.id}`);
+                    const remoteBtn = document.getElementById(`remote-btn-${child.id}`);
+
+                    // Calcular distância em metros
+                    const distMeters = dist * 1000;
+
+                    if (infoDiv) {
+                        const distText = dist < 1 ? `${distMeters.toFixed(0)}m` : `${dist.toFixed(1)}km`;
+                        const statusColor = distMeters <= 20 ? '#10b981' : (distMeters <= 200 ? '#f59e0b' : '#ef4444');
+                        infoDiv.innerHTML = `<span style="color: ${statusColor};">📍 Você está a <b>${distText}</b> da escola</span>`;
+                    }
+
+                    if (btn) {
+                        // REGRA: Só ativa o botão se estiver a <= 20 metros
+                        if (distMeters <= 20) {
+                            // PRÓXIMO - Ativar botão
+                            btn.disabled = false;
+                            btn.style.opacity = '1';
+                            btn.style.cursor = 'pointer';
+                            btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                            btn.style.boxShadow = '0 4px 20px rgba(16, 185, 129, 0.4)';
+                            btn.innerHTML = '✅ Estou na Escola - Notificar Chegada!';
+                            btn.classList.add('pulse-animation');
+
+                            // Esconder botão de autorização remota quando próximo
+                            if (remoteBtn) remoteBtn.style.display = 'none';
+
+                        } else if (distMeters <= 200) {
+                            // CHEGANDO (até 200m) - Ainda não pode clicar, mas está perto
+                            btn.disabled = true;
+                            btn.style.opacity = '0.8';
+                            btn.style.cursor = 'not-allowed';
+                            btn.style.background = '#f59e0b';
+                            btn.style.boxShadow = 'none';
+                            btn.innerHTML = `🚶 Aproxime-se mais (${distMeters.toFixed(0)}m)`;
+                            btn.classList.remove('pulse-animation');
+
+                            // Mostrar botão de autorização remota
+                            if (remoteBtn) remoteBtn.style.display = 'flex';
+
+                        } else {
+                            // LONGE - Desativado, mostrar opção de autorização remota
+                            btn.disabled = true;
+                            btn.style.opacity = '0.5';
+                            btn.style.cursor = 'not-allowed';
+                            btn.style.background = '#94a3b8';
+                            btn.style.boxShadow = 'none';
+                            btn.style.transform = 'scale(1)';
+                            btn.innerHTML = '🚗 Vá até a escola para notificar';
+                            btn.classList.remove('pulse-animation');
+
+                            // Mostrar botão de autorização remota
+                            if (remoteBtn) remoteBtn.style.display = 'flex';
+                        }
+                    }
+                }, err => {
+                    console.error('Erro de geo:', err);
+                    // Se não conseguir localização, mostrar botão de autorização remota
+                    const remoteBtn = document.getElementById(`remote-btn-${child.id}`);
+                    if (remoteBtn) remoteBtn.style.display = 'flex';
+                }, { enableHighAccuracy: true, timeout: 10000 });
+            };
+
+            track();
+            distanceTrackers[child.id] = setInterval(track, 5000); // Atualiza a cada 5 segundos
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        async function requestPickup(studentId, schoolId) {
+            const btn = document.getElementById(`pickup-btn-${studentId}`);
+            const originalText = btn.innerHTML;
+
+            try {
+                btn.disabled = true;
+                btn.innerHTML = 'Enviando...';
+
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/guardian/pickup`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ student_id: studentId, school_id: schoolId })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    btn.style.background = '#059669';
+                    btn.innerHTML = '✅ Notificado!';
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    }, 5000);
+                } else {
+                    alert(data.message || 'Erro ao notificar');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            } catch (error) {
+                alert('Erro na conexão');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        // Função para autorização remota (quando responsável está longe e outra pessoa vai buscar)
+        async function requestRemotePickup(studentId, schoolId, studentName) {
+            // Mostrar modal de confirmação
+            const confirmed = confirm(
+                `⚠️ ATENÇÃO: AUTORIZAÇÃO REMOTA\n\n` +
+                `Você está longe da escola e está autorizando a retirada de:\n\n` +
+                `👤 ${studentName}\n\n` +
+                `Isso significa que OUTRA PESSOA irá buscar seu filho(a) na escola.\n\n` +
+                `A escola será notificada de que você autorizou a retirada remotamente.\n\n` +
+                `Deseja realmente autorizar?`
+            );
+
+            if (!confirmed) {
+                return; // Usuário cancelou
+            }
+
+            const btn = document.getElementById(`remote-btn-${studentId}`);
+            const originalText = btn.innerHTML;
+
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Enviando autorização...';
+
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/guardian/pickup`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        student_id: studentId,
+                        school_id: schoolId,
+                        remote_authorization: true // Flag indicando que foi autorização remota
+                    })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    btn.style.background = 'rgba(16, 185, 129, 0.2)';
+                    btn.style.color = '#10b981';
+                    btn.style.border = '1px solid #10b981';
+                    btn.innerHTML = '✅ Autorização enviada!';
+
+                    // Mostrar alerta de sucesso
+                    alert(`✅ Autorização remota enviada!\n\nA escola foi notificada que você autorizou a retirada de ${studentName}.\n\nLembre-se: Somente pessoas autorizadas poderão retirar.`);
+
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                        btn.style.background = 'rgba(239, 68, 68, 0.1)';
+                        btn.style.color = '#ef4444';
+                        btn.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                    }, 10000);
+                } else {
+                    alert(data.message || 'Erro ao enviar autorização');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            } catch (error) {
+                alert('Erro na conexão. Tente novamente.');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
             }
         }
 
@@ -1884,10 +2238,88 @@
                     div.classList.add('day-absent');
                     // Fim de semana check simples
                 }
-
                 container.appendChild(div);
             }
         }
+
+        // --- EVENTOS E NOTIFICAÇÕES DA ESCOLA ---
+        async function loadEventsAndNotifications() {
+            const eventsListDiv = document.getElementById('eventsList');
+            const eventsEmptyDiv = document.getElementById('eventsEmpty');
+
+            // Visual simples como solicitado ("como ontem")
+            eventsListDiv.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">Carregando...</p>';
+            eventsEmptyDiv.classList.add('hidden');
+
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    showLogin();
+                    return;
+                }
+
+                console.log('🔄 Sincronizando eventos com o servidor...');
+                const res = await fetch(`${API_URL} /guardian/school - events`, {
+                    headers: { 'Authorization': `Bearer ${token} ` }
+                });
+
+                if (res.status === 401 || res.status === 403) {
+                    localStorage.clear();
+                    showLogin();
+                    return;
+                }
+
+                if (!res.ok) throw new Error(`Erro API: ${res.status} `);
+
+                const data = await res.json();
+                const events = data.events || [];
+                console.log(`✅ Recebidos ${events.length} eventos.`);
+
+                if (events.length === 0) {
+                    eventsListDiv.innerHTML = '';
+                    eventsEmptyDiv.classList.remove('hidden');
+                    return;
+                }
+
+                // Renderizar eventos
+                eventsListDiv.innerHTML = events.map(event => {
+                    const d = event.event_date ? new Date(event.event_date) : null;
+                    const dateStr = d ? d.toLocaleDateString('pt-BR') : 'Data a confirmar';
+                    const hasCost = event.cost && parseFloat(event.cost) > 0;
+
+                    return `
+                    < div class="event-card" >
+                            <div class="event-header">
+                                <h3 class="event-title">${event.title || 'Evento'}</h3>
+                                ${hasCost ? `<span class="badge-cost">R$ ${parseFloat(event.cost).toFixed(2)}</span>` : ''}
+                            </div>
+                            <p class="event-desc">${event.description || ''}</p>
+                            <div class="event-meta">
+                                <span>📅 ${dateStr}</span>
+                                <span>🏫 ${event.school_name || 'Escola'}</span>
+                                ${event.class_name ? `<span>📚 ${event.class_name}</span>` : '<span>👥 Geral</span>'}
+                            </div>
+                             ${event.pix_key ? `
+                                <div class="pix-box">
+                                    <strong>Pix:</strong> ${event.pix_key}
+                                </div>
+                            ` : ''
+                        }
+                        </div >
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Falha nos eventos:', error);
+                eventsListDiv.innerHTML = `
+                    < div style = "text-align:center; padding:20px; color:#ef4444;" >
+                        <p>Não foi possível atualizar os eventos.</p>
+                        <button onclick="loadEventsAndNotifications()" style="margin-top:10px; padding:8px 16px; background:#ef4444; color:white; border:none; border-radius:8px;">Tentar Novamente</button>
+                    </div >
+                    `;
+            }
+        }
+
         // --- CHAT SYSTEM ---
         function loadChatList() {
             const list = document.getElementById('chatList');
@@ -1901,7 +2333,7 @@
 
             empty.classList.add('hidden');
             list.innerHTML = myStudentsData.map(s => `
-                <div class="chat-list-item" onclick="openChat(${s.id})">
+                    < div class="chat-list-item" onclick = "openChat(${s.id})" >
                     <div class="child-avatar">
                         ${s.photo_url ? `<img src="${s.photo_url}">` : s.name.charAt(0)}
                     </div>
@@ -1910,8 +2342,8 @@
                         <div class="child-details">${s.schoolName || 'Escola'}</div>
                     </div>
                     <div style="font-size: 20px; color: #ddd;">›</div>
-                </div>
-            `).join('');
+                </div >
+                    `).join('');
         }
 
         async function openChat(studentId) {
@@ -1961,7 +2393,7 @@
 
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/guardian/chat/${activeChatStudentId}/messages?schoolId=${student.schoolId}`, {
+                const res = await fetch(`${API_URL} /guardian/chat / ${activeChatStudentId}/messages?schoolId=${student.schoolId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const msgs = await res.json();
