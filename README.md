@@ -300,6 +300,32 @@ graph TD
 - Histórico de presenças
 - Relatórios exportáveis
 
+### 9. 💬 Sistema de Comunicação Integrado (Update v2.0)
+
+O **EduFocus** agora conta com um poderoso ecossistema de mensagens em tempo real, eliminando a necessidade de agendas de papel ou aplicativos de terceiros não integrados (como WhatsApp pessoal).
+
+#### 🏫 Escola ↔️ Professor
+*   **Canal Direto:** O professor possui uma aba "Mensagens" no seu Dashboard para contato direto com a Administração/Coordenação.
+*   **Fluxo Bidirecional:** A escola recebe as mensagens em um painel centralizado e pode responder imediatamente. O professor é notificado visualmente de novas respostas.
+*   **Tecnologia:** Polling automático (5s) garante que a comunicação seja fluida sem necessidade de recarregar a página.
+
+#### 🏠 Escola ↔️ Responsável (App PWA)
+*   **Chat Dedicado:** No App do Responsável, a aba "Mensagens" permite diálogo direto sobre o aluno específico.
+*   **Envio de Mídia:** Suporte nativo para envio de:
+    *   📷 Fotos (comprovantes, atestados)
+    *   🎙️ Áudio (mensagens de voz rápidas)
+    *   📎 Arquivos (documentos PDF)
+*   **UX Aprimorada:**
+    *   Scroll automático para a última mensagem.
+    *   Separação visual de mensagens por data ("Hoje", "Ontem").
+    *   Quebra de linha inteligente para textos longos.
+*   **Performance:** Atualização automática (3s) para sensação de tempo real.
+
+#### 🎛️ Painel de Gestão da Comunicação
+*   **Central de Mensagens:** A escola gerencia todas as conversas (Pais e Professores) em uma interface unificada.
+*   **Transmissão (Broadcast):** Capacidade de enviar uma mensagem única para **todos os pais de uma turma** (ex: "Amanhã saída antecipada").
+*   **Tratamento de Dados:** Mensagens longas são formatadas automaticamente para leitura confortável, sem quebrar o layout.
+
 ---
 
 ## 📜 Regras de Negócio
