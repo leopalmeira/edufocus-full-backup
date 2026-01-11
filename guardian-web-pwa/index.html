@@ -1474,7 +1474,10 @@
 
     <script>
         // API Local (Porta 5000)
-        const API_URL = 'http://localhost:5000/api';
+        // Se estiver rodando localmente no PC, usa localhost. Se na rede, usa o IP da rede.
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:5000/api'
+            : `http://${window.location.hostname}:5000/api`;
 
         let user = null;
         let selectedSchool = null;

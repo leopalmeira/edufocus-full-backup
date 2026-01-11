@@ -10,60 +10,82 @@ import sqlite3
 
 guardian_bp = Blueprint('guardian', __name__)
 
-@guardian_bp.route('/api/guardian/login', methods=['POST'])
-@guardian_bp.route('/api/guardian/auth/login', methods=['POST'])
+@guardian_bp.route('/api/guardian/login', methods=['POST', 'OPTIONS'])
+@guardian_bp.route('/api/guardian/auth/login', methods=['POST', 'OPTIONS'])
 def login():
-    data = request.json
-    email = data.get('email')
-    password = data.get('password')
-    
-    db = get_system_db()
-    cur = db.cursor()
-    
-    # Debug: mostrar todos os guardians
-    all_guardians = cur.execute('SELECT id, email FROM guardians').fetchall()
-    print(f"🔍 Total de guardians no banco: {len(all_guardians)}")
-    for g in all_guardians:
-        print(f"   - ID {g['id']}: {g['email']}")
-    
-    cur.execute('SELECT * FROM guardians WHERE email = ?', (email,))
-    guardian = cur.fetchone()
-    
-    if not guardian:
-        print(f"❌ Guardian não encontrado: {email}")
-        return jsonify({'success': False, 'message': 'Credenciais inválidas'}), 401
-    
-    print(f"✅ Guardian encontrado: {guardian['email']}")
-    print(f"🔑 Hash armazenado: {guardian['password'][:50]}...")
-    
-    valid = False
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
     try:
-        if guardian['password'].startswith('$2'):
-            print(f"🔐 Verificando com bcrypt...")
-            if bcrypt.checkpw(password.encode('utf-8'), guardian['password'].encode('utf-8')):
-                valid = True
-                print(f"✅ Senha bcrypt válida!")
-            else:
-                print(f"❌ Senha bcrypt inválida!")
-        else:
-            print(f"🔐 Verificando senha plain text...")
-            if password == guardian['password']:
-                valid = True
-                print(f"✅ Senha plain válida!")
-            else:
-                print(f"❌ Senha plain inválida!")
-    except Exception as e:
-        print(f"❌ Erro na verificação: {e}")
-        valid = False
+        if request.method == 'OPTIONS':
+            return jsonify({'status': 'ok'}), 200
+
+        data = request.json or {}
+        email = data.get('email')
+        password = data.get('password')
         
-    if not valid:
-        print(f"❌ Autenticação falhou para {email}")
-        return jsonify({'success': False, 'message': 'Credenciais inválidas'}), 401
+        if not email or not password:
+            return jsonify({'success': False, 'message': 'Email e senha são obrigatórios'}), 400
+        
+        db = get_system_db()
+        cur = db.cursor()
+        
+        # Debug: mostrar todos os guardians log
+        try:
+            all_guardians = cur.execute('SELECT id, email FROM guardians').fetchall()
+            print(f"🔍 Total de guardians no banco: {len(all_guardians)}")
+            for guard_item in all_guardians:
+                print(f"   - ID {guard_item['id']}: {guard_item['email']}")
+        except Exception as e:
+            print(f"Erro no debug log: {e}")
+        
+        cur.execute('SELECT * FROM guardians WHERE email = ?', (email,))
+        guardian = cur.fetchone()
+        
+        if not guardian:
+            print(f"❌ Guardian não encontrado: {email}")
+            return jsonify({'success': False, 'message': 'Credenciais inválidas'}), 401
+        
+        print(f"✅ Guardian encontrado: {guardian['email']}")
+        
+        stored_password = guardian['password']
+        if not stored_password:
+             print("❌ Senha nula no banco")
+             return jsonify({'success': False, 'message': 'Erro no cadastro do usuário'}), 500
+
+        valid = False
+        try:
+            if stored_password.startswith('$2'):
+                print(f"🔐 Verificando com bcrypt...")
+                if bcrypt.checkpw(str(password).encode('utf-8'), str(stored_password).encode('utf-8')):
+                    valid = True
+                    print(f"✅ Senha bcrypt válida!")
+                else:
+                    print(f"❌ Senha bcrypt inválida!")
+            else:
+                print(f"🔐 Verificando senha plain text...")
+                if str(password) == str(stored_password):
+                    valid = True
+                    print(f"✅ Senha plain válida!")
+                else:
+                    print(f"❌ Senha plain inválida!")
+        except Exception as e:
+            print(f"❌ Erro na verificação de senha: {e}")
+            valid = False
+            
+        if not valid:
+            print(f"❌ Autenticação falhou para {email}")
+            return jsonify({'success': False, 'message': 'Credenciais inválidas'}), 401
+            
+    except Exception as e:
+        print(f"❌ ERRO CRÍTICO NO LOGIN: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': 'Erro interno no servidor'}), 500
         
     token = jwt.encode({
         'id': guardian['id'],
         'email': guardian['email'],
-        'role': guardian.get('role', 'guardian'),
+        'role': dict(guardian).get('role', 'guardian'),
         'exp': datetime.datetime.utcnow() + datetime.timedelta(days=30)
     }, SECRET_KEY, algorithm='HS256')
     

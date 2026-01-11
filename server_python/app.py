@@ -17,13 +17,9 @@ app = Flask(__name__, static_folder='../client/dist')
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0 # Desativar cache em desenvolvimento
 
 # Configuração CORS - permitir todas as origens em desenvolvimento
-CORS(app, resources={r"/api/*": {
-    "origins": ["http://localhost:5173", "http://localhost:3001", "http://127.0.0.1:5173", "http://127.0.0.1:3001"],
-    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
-    "supports_credentials": True,
-    "expose_headers": ["Content-Type", "Authorization"]
-}})
+# Configuração CORS - permitir todas as origens globalmente para evitar problemas
+CORS(app, resources={r"/*": {"origins": "*"}})
+
 
 # Health check - rota crucial para monitoramento
 @app.route('/api/health')
