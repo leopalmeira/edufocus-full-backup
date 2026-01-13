@@ -1,4 +1,25 @@
 services:
+  # Backend Node.js (Principal)
+  - type: web
+    name: edufocus-backend
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && cd server && npm install
+    startCommand: node server/server.js
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_VERSION
+        value: 20.9.0
+      - key: SECRET_KEY
+        generateValue: true
+    # disk:
+    #     name: data
+    #     mountPath: /opt/render/project/src/server/db
+    #     sizeGB: 1
+
+  # Backend Python (Opcional - se usado para IA)
   - type: web
     name: edufocus-python-backend
     runtime: python
@@ -10,8 +31,3 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
-      - key: FLASK_ENV
-        value: production
-      - key: SECRET_KEY
-        generateValue: true
-    healthCheckPath: /api/health

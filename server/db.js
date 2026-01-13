@@ -449,6 +449,18 @@ function getSchoolDB(schoolId) {
       FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
     );
 
+    -- Pickups (Fila de Retirada)
+    CREATE TABLE IF NOT EXISTS pickups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      guardian_id INTEGER NOT NULL,
+      status TEXT DEFAULT 'waiting', -- waiting, calling, completed
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      remote_authorization INTEGER DEFAULT 0,
+      FOREIGN KEY (student_id) REFERENCES students(id),
+      FOREIGN KEY (guardian_id) REFERENCES guardians(id)
+    );
+
     -- Índices para melhor performance
     CREATE INDEX IF NOT EXISTS idx_employee_attendance_date 
     ON employee_attendance(date(timestamp));

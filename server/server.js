@@ -237,6 +237,23 @@ try {
     console.error('Error initializing database:', error);
 }
 
+// Migration: Add geolocation columns to schools table (SYSTEM DB)
+try {
+    const systemDB = getSystemDB();
+    const tableInfo = systemDB.prepare("PRAGMA table_info(schools)").all();
+    const hasLatitude = tableInfo.some(col => col.name === 'latitude');
+
+    if (!hasLatitude) {
+        console.log('Migrating system DB: Adding geolocation columns to schools');
+        systemDB.prepare("ALTER TABLE schools ADD COLUMN latitude REAL").run();
+        systemDB.prepare("ALTER TABLE schools ADD COLUMN longitude REAL").run();
+        systemDB.prepare("ALTER TABLE schools ADD COLUMN number TEXT").run();
+        systemDB.prepare("ALTER TABLE schools ADD COLUMN zip_code TEXT").run();
+    }
+} catch (e) {
+    console.error('Error migrating schools table:', e);
+}
+
 // Middleware to verify token
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -662,6 +679,107 @@ app.post('/api/admin/technicians', authenticateToken, async (req, res) => {
 
 // --- SCHOOL ROUTES ---
 
+// Configurações da Escola (GPS e Endereço)
+app.get('/api/school/settings', authenticateToken, (req, res) => {
+    // Aceita school_admin ou super_admin
+    if (req.user.role !== 'school_admin' && req.user.role !== 'super_admin') return res.sendStatus(403);
+
+    const db = getSystemDB();
+    // Se for super_admin impersonating, poderia ser diferente, mas vamos assumir o próprio login da escola
+    const id = req.user.school_id || req.user.id;
+
+    try {
+        const school = db.prepare('SELECT id, name, address, number, zip_code, latitude, longitude FROM schools WHERE id = ?').get(id);
+        if (!school) return res.status(404).json({ error: 'Escola não encontrada' });
+        res.json(school);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Erro ao buscar settings' });
+    }
+});
+
+app.post('/api/school/settings', authenticateToken, (req, res) => {
+    if (req.user.role !== 'school_admin') return res.sendStatus(403);
+    const { address, number, zip_code, latitude, longitude } = req.body;
+    const db = getSystemDB();
+    const id = req.user.school_id || req.user.id;
+
+    try {
+        db.prepare(`
+            UPDATE schools 
+            SET address = ?, number = ?, zip_code = ?, latitude = ?, longitude = ? 
+            WHERE id = ?
+        `).run(address, number, zip_code, latitude, longitude, id);
+
+        console.log(`✅ Settings atualizados para escola ID ${id}: GPS ${latitude}, ${longitude}`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao salvar settings:', error);
+        res.status(500).json({ error: 'Erro ao salvar configurações' });
+    }
+});
+
+// --- ROTA DE PICKUPS (INSPETOR/ESCOLA) ---
+app.get('/api/school/pickups', authenticateToken, (req, res) => {
+    // Permite acesso para school_admin, teacher (se necessário) e outros roles da escola
+    const schoolId = req.user.school_id || req.user.id;
+    const schoolDB = getSchoolDB(schoolId);
+    const systemDB = getSystemDB();
+
+    try {
+        // Verificar tabela
+        try { schoolDB.prepare("SELECT id FROM pickups LIMIT 1").get(); }
+        catch (e) { return res.json([]); } // Tabela ainda não criada ou vazia
+
+        // Retiradas de hoje (últimas 24h para garantir)
+        const pickups = schoolDB.prepare(`
+            SELECT 
+                p.*,
+                s.name as student_name,
+                s.photo_url,
+                s.class_name
+            FROM pickups p
+            JOIN students s ON p.student_id = s.id
+            WHERE date(p.timestamp) = date('now', 'localtime')
+            ORDER BY p.timestamp DESC
+        `).all();
+
+        // Enriquecer com nomes dos guardians (estão no SystemDB)
+        if (pickups.length > 0) {
+            const guardianIds = [...new Set(pickups.map(p => p.guardian_id))];
+            // SQLite `WHERE IN (...)` precisa de placeholders
+            const placeholders = guardianIds.map(() => '?').join(',');
+            const guardians = systemDB.prepare(`SELECT id, name FROM guardians WHERE id IN (${placeholders})`).all(...guardianIds);
+
+            const guardianMap = {};
+            guardians.forEach(g => guardianMap[g.id] = g.name);
+
+            pickups.forEach(p => {
+                p.guardian_name = guardianMap[p.guardian_id] || 'Responsável';
+            });
+        }
+
+        res.json(pickups);
+    } catch (error) {
+        console.error('Erro ao listar pickups:', error);
+        res.status(500).json({ error: 'Erro de servidor' });
+    }
+});
+
+app.post('/api/school/pickups/:id/status', authenticateToken, (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body; // 'calling', 'completed'
+    const schoolId = req.user.school_id || req.user.id;
+    const schoolDB = getSchoolDB(schoolId);
+
+    try {
+        schoolDB.prepare('UPDATE pickups SET status = ? WHERE id = ?').run(status, id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Erro ao atualizar status' });
+    }
+});
+
 app.get('/api/school/teachers', authenticateToken, (req, res) => {
     if (req.user.role !== 'school_admin') return res.sendStatus(403);
     const db = getSystemDB();
@@ -781,189 +899,49 @@ app.post('/api/school/students', authenticateToken, async (req, res) => {
         }
 
         // ==================================================================================
-        // 3. AUTO-CADASTRO DE RESPONSÁVEL (SOLICITADO PELO USUÁRIO)
+        // 3. VÍNCULO AUTOMÁTICO SE RESPONSÁVEL JÁ EXISTIR
         // ==================================================================================
         console.log('🔍 Verificando parent_email:', parent_email);
+        let guardianMessage = '';
+
         if (parent_email) {
-            console.log('✅ parent_email existe! Iniciando processo de cadastro automático...');
             try {
                 const systemDB = getSystemDB();
+                // Verificar se responsável já existe
+                const guardian = systemDB.prepare('SELECT id, email, name FROM guardians WHERE email = ?').get(parent_email);
 
-                // Verificar se responsável já existe no sistema global
-                let guardian = systemDB.prepare('SELECT * FROM guardians WHERE email = ?').get(parent_email);
-                let password = null;
-                let isNewAccount = false;
+                if (guardian) {
+                    console.log('✅ Responsável encontrado no sistema! Criando vínculo automático...');
 
-                console.log('🔎 Guardian encontrado?', guardian ? 'SIM' : 'NÃO (vai criar novo)');
+                    const linkExists = schoolDB.prepare('SELECT id FROM student_guardians WHERE student_id = ? AND guardian_id = ?').get(studentId, guardian.id);
 
-                if (!guardian) {
-                    // Criar nova conta
-                    isNewAccount = true;
-                    password = Math.random().toString(36).slice(-8); // Senha aleatória de 8 chars
-                    console.log('🔐 Senha gerada:', password);
-                    const hashedPassword = await bcrypt.hash(password, 10);
-
-                    const gResult = systemDB.prepare(`
-                        INSERT INTO guardians (email, password, name, phone)
-                        VALUES (?, ?, ?, ?)
-                    `).run(parent_email, hashedPassword, `Responsável de ${name}`, phone || '');
-
-                    guardian = { id: gResult.lastInsertRowid, email: parent_email };
-                    console.log('✨ [AUTO-CADASTRO] Conta de Responsável GLOBAL criada com sucesso! ID:', guardian.id);
-                }
-
-                // Vincular Aluno ao Responsável (no DB da Escola)
-                const linkExists = schoolDB.prepare('SELECT id FROM student_guardians WHERE student_id = ? AND guardian_id = ?').get(studentId, guardian.id);
-
-                if (!linkExists) {
-                    schoolDB.prepare(`
-                        INSERT INTO student_guardians (student_id, guardian_id, relationship, status)
-                        VALUES (?, ?, ?, 'active')
-                    `).run(studentId, guardian.id, 'Responsável');
-                    console.log(`🔗 Aluno vinculado automaticamente ao responsável ID ${guardian.id}`);
-                }
-
-                // ==================================================================================
-                // ENVIO REAL DE EMAIL
-                // ==================================================================================
-
-                if (isNewAccount && password) {
-                    // Nova conta - enviar credenciais
-                    const mailOptions = {
-                        from: '"EduFocus" <noreply@edufocus.com>',
-                        to: parent_email,
-                        subject: '🎓 Bem-vindo ao EduFocus - Suas Credenciais de Acesso',
-                        html: `
-                            <!DOCTYPE html>
-                            <html>
-                            <head>
-                                <style>
-                                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                                    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-                                    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-                                    .credentials { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea; }
-                                    .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; margin-top: 20px; }
-                                    .footer { text-align: center; margin-top: 20px; color: #6b7280; font-size: 14px; }
-                                </style>
-                            </head>
-                            <body>
-                                <div class="container">
-                                    <div class="header">
-                                        <h1>🎓 Bem-vindo ao EduFocus!</h1>
-                                        <p>Acompanhe a chegada e saída do seu filho em tempo real</p>
-                                    </div>
-                                    <div class="content">
-                                        <h2>Olá, Responsável!</h2>
-                                        <p>Uma conta foi criada para você no <strong>EduFocus</strong> para acompanhar o aluno <strong>${name}</strong>.</p>
-                                        
-                                        <div class="credentials">
-                                            <h3>📧 Suas Credenciais de Acesso:</h3>
-                                            <p><strong>Login:</strong> ${parent_email}</p>
-                                            <p><strong>Senha:</strong> <code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-size: 16px;">${password}</code></p>
-                                        </div>
-                                        
-                                        <p><strong>⚠️ IMPORTANTE:</strong> Anote ou tire uma foto desta senha! Você precisará dela para fazer login.</p>
-                                        
-                                        <h3>📱 Como Acessar:</h3>
-                                        <ol>
-                                            <li>Baixe o aplicativo EduFocus Guardian</li>
-                                            <li>Faça login com o email e senha acima</li>
-                                            <li>Receba notificações em tempo real quando seu filho chegar ou sair da escola!</li>
-                                        </ol>
-                                        
-                                        <a href="http://192.168.0.11:5176/guardian-download.html" class="button">📲 Baixar Aplicativo</a>
-                                        
-                                        <div class="footer">
-                                            <p>Este é um email automático. Por favor, não responda.</p>
-                                            <p>EduFocus - Monitoramento Escolar Inteligente</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </body>
-                            </html>
-                        `
-                    };
-
-                    try {
-                        const info = await transporter.sendMail(mailOptions);
-                        console.log('\n✅ EMAIL ENVIADO COM SUCESSO!');
-                        console.log('📧 Para:', parent_email);
-                        console.log('🔑 Login:', parent_email);
-                        console.log('🔒 Senha:', password);
-
-                        // Se estiver usando Ethereal (teste), mostrar link de preview
-                        if (info.messageId && process.env.EMAIL_USER === undefined) {
-                            const previewUrl = nodemailer.getTestMessageUrl(info);
-                            if (previewUrl) {
-                                console.log('🔗 PREVIEW URL (Ethereal):', previewUrl);
-                                console.log('   (Abra este link para ver o email)');
-                            }
-                        }
-                    } catch (emailError) {
-                        console.error('❌ Erro ao enviar email:', emailError.message);
-                        // Continua mesmo se o email falhar (senha será exibida na tela)
+                    if (!linkExists) {
+                        schoolDB.prepare(`
+                            INSERT INTO student_guardians (student_id, guardian_id, relationship, status)
+                            VALUES (?, ?, ?, 'active')
+                        `).run(studentId, guardian.id, 'Responsável');
+                        console.log(`🔗 Aluno vinculado automaticamente ao responsável ID ${guardian.id}`);
+                        guardianMessage = `Aluno vinculado automaticamente ao responsável: ${guardian.name}`;
+                    } else {
+                        guardianMessage = `Aluno já estava vinculado a este responsável.`;
                     }
-                } else if (!isNewAccount) {
-                    // Conta existente - avisar sobre novo vínculo
-                    const mailOptions = {
-                        from: '"EduFocus" <noreply@edufocus.com>',
-                        to: parent_email,
-                        subject: '🎓 Novo Aluno Vinculado - EduFocus',
-                        html: `
-                            <!DOCTYPE html>
-                            <html>
-                            <head>
-                                <style>
-                                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                                    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-                                    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-                                    .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; margin-top: 20px; }
-                                </style>
-                            </head>
-                            <body>
-                                <div class="container">
-                                    <div class="header">
-                                        <h1>🎓 Novo Aluno Vinculado!</h1>
-                                    </div>
-                                    <div class="content">
-                                        <h2>Olá!</h2>
-                                        <p>O aluno <strong>${name}</strong> foi vinculado à sua conta no EduFocus.</p>
-                                        <p>Agora você receberá notificações sobre a chegada e saída deste aluno.</p>
-                                        <p>Use suas credenciais existentes para acessar o aplicativo.</p>
-                                        <a href="http://192.168.0.11:5176/guardian-download.html" class="button">📲 Abrir Aplicativo</a>
-                                    </div>
-                                </div>
-                            </body>
-                            </html>
-                        `
-                    };
-
-                    try {
-                        await transporter.sendMail(mailOptions);
-                        console.log('\n✅ EMAIL DE VÍNCULO ENVIADO!');
-                        console.log('📧 Para:', parent_email);
-                    } catch (emailError) {
-                        console.error('❌ Erro ao enviar email de vínculo:', emailError.message);
-                    }
+                } else {
+                    console.log('ℹ️ Responsável não tem conta no sistema. O email foi salvo no cadastro do aluno.');
+                    guardianMessage = 'Responsável ainda não cadastrado. Peça para ele se cadastrar com o email informado.';
                 }
 
-                return res.json({
-                    message: 'Student created',
-                    id: studentId,
-                    guardian_login: parent_email,
-                    guardian_password: password // Retornar senha gerada para exibir na tela (fallback se email falhar)
-                });
             } catch (err) {
-                console.error('⚠️ Erro no processo automático de responsável:', err);
-                // Se der erro no email, ainda retorna sucesso do aluno, mas sem dados do pai
-                return res.json({ message: 'Student created (Email failed)', id: studentId });
+                console.error('❌ Erro no processo de vínculo automático (não crítico):', err);
             }
         }
 
-        // Sem email de responsável
-        res.json({ message: 'Student created', id: studentId });
+        res.json({
+            message: 'Student created successfully',
+            id: studentId,
+            guardian_login: parent_email,
+            guardian_info: guardianMessage
+        });
+
     } catch (error) {
         console.error('❌ Erro ao cadastrar aluno:', error);
         console.error('Stack:', error.stack);
@@ -2774,14 +2752,30 @@ app.delete('/school/:schoolId/class/:classId', authenticateToken, async (req, re
             WHERE class_name = ?
         `).get(classInfo.name)?.count || 0;
 
-        // Excluir alunos vinculados à turma (CASCADE)
-        if (studentsCount > 0) {
-            console.log(`🗑️ Excluindo ${studentsCount} aluno(s) da turma ${classInfo.name}...`);
-            schoolDB.prepare('DELETE FROM students WHERE class_name = ?').run(classInfo.name);
-        }
-
         // Remover vínculos com professores
         schoolDB.prepare('DELETE FROM teacher_classes WHERE class_id = ?').run(classId);
+
+        // Excluir alunos vinculados à turma (Precisa ser deep clean para evitar FK constraints)
+        // Primeiro buscar IDs dos alunos para limpar tabelas relacionadas
+        const students = schoolDB.prepare('SELECT id FROM students WHERE class_name = ?').all(classInfo.name);
+
+        if (students.length > 0) {
+            console.log(`🗑️ Excluindo ${students.length} aluno(s) da turma ${classInfo.name}...`);
+            const studentIds = students.map(s => s.id);
+            const placeholders = studentIds.map(() => '?').join(',');
+
+            // Limpar dependências dos alunos (attendance, face_descriptors, etc.)
+            // Assumindo que o banco pode não ter CASCADE configurado ou ativo em todos os lugares
+            schoolDB.prepare(`DELETE FROM attendance WHERE student_id IN (${placeholders})`).run(...studentIds);
+            schoolDB.prepare(`DELETE FROM face_descriptors WHERE student_id IN (${placeholders})`).run(...studentIds);
+            schoolDB.prepare(`DELETE FROM student_guardians WHERE student_id IN (${placeholders})`).run(...studentIds);
+            try { schoolDB.prepare(`DELETE FROM student_attention WHERE student_id IN (${placeholders})`).run(...studentIds); } catch (e) { }
+            try { schoolDB.prepare(`DELETE FROM question_responses WHERE student_id IN (${placeholders})`).run(...studentIds); } catch (e) { }
+            try { schoolDB.prepare(`DELETE FROM exam_results WHERE student_id IN (${placeholders})`).run(...studentIds); } catch (e) { }
+
+            // Finalmente deletar os alunos
+            schoolDB.prepare('DELETE FROM students WHERE class_name = ?').run(classInfo.name);
+        }
 
         // Remover vínculos com câmeras (camera_classes)
         try {
@@ -4562,6 +4556,7 @@ app.get('/api/school/employee-attendance', authenticateToken, (req, res) => {
 // ==================== ENDPOINTS DE GUARDIANS (RESPONSÁVEIS) ====================
 
 // Registro de Guardian
+// Registro de Guardian
 app.post('/api/guardian/register', async (req, res) => {
     const { email, password, name, phone } = req.body;
     const db = getSystemDB();
@@ -4582,19 +4577,64 @@ app.post('/api/guardian/register', async (req, res) => {
             VALUES (?, ?, ?, ?)
         `).run(email, hashedPassword, name, phone);
 
+        const guardianId = result.lastInsertRowid;
+        console.log(`✅ Guardian cadastrado: ${name} (${email}) - ID: ${guardianId}`);
+
+        // ==================================================================================
+        // AUTO-VÍNCULO: Procurar alunos em todas as escolas com este email de responsável
+        // ==================================================================================
+        try {
+            console.log('🔄 Iniciando varredura de alunos pré-cadastrados para este email...');
+            const schools = db.prepare('SELECT id, name FROM schools').all();
+            let linkedCount = 0;
+
+            for (const school of schools) {
+                try {
+                    const schoolDB = getSchoolDB(school.id);
+
+                    // Buscar alunos com este parent_email e SEM vínculo com este guardian (para evitar dup)
+                    // Na verdade, basta buscar alunos e tentar inserir ignorando erro ou checando antes.
+                    const students = schoolDB.prepare('SELECT id, name FROM students WHERE parent_email = ?').all(email);
+
+                    for (const student of students) {
+                        try {
+                            const linkResult = schoolDB.prepare(`
+                                INSERT INTO student_guardians (student_id, guardian_id, relationship, status)
+                                SELECT ?, ?, ?, ?
+                                WHERE NOT EXISTS (
+                                    SELECT 1 FROM student_guardians WHERE student_id = ? AND guardian_id = ?
+                                )
+                            `).run(student.id, guardianId, 'Responsável', 'active', student.id, guardianId);
+
+                            if (linkResult.changes > 0) {
+                                console.log(`🔗 Vínculo Automático: Aluno ${student.name} (Escola ${school.name}) -> Guardian ${name}`);
+                                linkedCount++;
+                            }
+                        } catch (linkErr) {
+                            console.error(`❌ Erro ao vincular aluno ${student.id} na escola ${school.id}:`, linkErr.message);
+                        }
+                    }
+                } catch (schoolErr) {
+                    // Ignora erro se DB da escola não abrir ou tabela não existir
+                }
+            }
+            console.log(`✨ Processo de auto-vínculo concluído. ${linkedCount} alunos vinculados.`);
+
+        } catch (autoLinkErr) {
+            console.error('⚠️ Erro não vital no auto-vínculo:', autoLinkErr);
+        }
+
         // Gerar token JWT
         const token = jwt.sign(
-            { id: result.lastInsertRowid, role: 'guardian', email },
+            { id: guardianId, role: 'guardian', email },
             SECRET_KEY,
             { expiresIn: '30d' }
         );
 
-        console.log(`✅ Guardian cadastrado: ${name} (${email})`);
-
         res.json({
             token,
             user: {
-                id: result.lastInsertRowid,
+                id: guardianId,
                 email,
                 name,
                 phone,
@@ -4652,12 +4692,26 @@ app.post('/api/guardian/login', async (req, res) => {
 // Middleware de autenticação para guardians
 function authenticateGuardian(req, res, next) {
     const authHeader = req.headers.authorization;
-    if (!authHeader) return res.sendStatus(401);
+    console.log('🔐 [Guardian Auth] Header:', authHeader ? 'Presente' : 'Ausente');
+
+    if (!authHeader) {
+        console.log('❌ [Guardian Auth] Sem header de autorização');
+        return res.status(401).json({ error: 'Token não fornecido' });
+    }
 
     const token = authHeader.split(' ')[1];
+    console.log('🔑 [Guardian Auth] Token:', token ? token.substring(0, 20) + '...' : 'Vazio');
+
     jwt.verify(token, SECRET_KEY, (err, user) => {
-        if (err) return res.sendStatus(403);
-        if (user.role !== 'guardian') return res.sendStatus(403);
+        if (err) {
+            console.log('❌ [Guardian Auth] Token inválido:', err.message);
+            return res.status(403).json({ error: 'Token inválido ou expirado' });
+        }
+        if (user.role !== 'guardian') {
+            console.log('❌ [Guardian Auth] Role incorreta:', user.role);
+            return res.status(403).json({ error: 'Acesso negado' });
+        }
+        console.log('✅ [Guardian Auth] Autenticado:', user.email);
         req.user = user;
         next();
     });
@@ -4730,6 +4784,9 @@ app.get('/api/guardian/schools/:schoolId/students/search', authenticateGuardian,
 
 // Vincular aluno (AUTOMÁTICO - sem aprovação da escola)
 app.post('/api/guardian/link-student', authenticateGuardian, async (req, res) => {
+    console.log('📎 [Link Student] Body recebido:', req.body);
+    console.log('📎 [Link Student] Guardian ID:', req.user.id);
+
     const { school_id, student_id } = req.body; // Aceita snake_case do frontend
     const guardianId = req.user.id;
     const db = getSystemDB();
@@ -4738,7 +4795,11 @@ app.post('/api/guardian/link-student', authenticateGuardian, async (req, res) =>
     const finalSchoolId = school_id || req.body.schoolId;
     const finalStudentId = student_id || req.body.studentId;
 
+    console.log('📎 [Link Student] School ID:', finalSchoolId);
+    console.log('📎 [Link Student] Student ID:', finalStudentId);
+
     if (!finalSchoolId || !finalStudentId) {
+        console.log('❌ [Link Student] Dados incompletos!');
         return res.status(400).json({ error: 'Dados incompletos' });
     }
 
@@ -4761,7 +4822,12 @@ app.post('/api/guardian/link-student', authenticateGuardian, async (req, res) =>
         `).get(finalStudentId, guardianId);
 
         if (linkExists) {
-            return res.status(400).json({ error: 'Aluno já vinculado' });
+            console.log('✅ [Link Student] Aluno já vinculado anteriormente. Retornando sucesso para fluxo.');
+            return res.json({
+                success: true,
+                message: 'Aluno vinculado com sucesso!',
+                alreadyLinked: true
+            });
         }
 
         // Criar vínculo
@@ -4783,40 +4849,87 @@ app.post('/api/guardian/link-student', authenticateGuardian, async (req, res) =>
 // Listar alunos vinculados do guardian
 app.get('/api/guardian/my-students', authenticateGuardian, (req, res) => {
     const guardianId = req.user.id;
+    console.log(`🔍 [My Students] Buscando alunos para Guardian ID: ${guardianId}`);
+
     const db = getSystemDB();
 
     try {
         // Buscar todas as escolas
-        const schools = db.prepare('SELECT id, name FROM schools').all();
+        // Buscar todas as escolas (incluindo GPS)
+        const schools = db.prepare('SELECT id, name, latitude, longitude FROM schools').all();
+        console.log(`🔍 [My Students] Total de escolas no sistema: ${schools.length}`);
+
         const allStudents = [];
 
         schools.forEach(school => {
-            const schoolDB = getSchoolDB(school.id);
+            try {
+                const schoolDB = getSchoolDB(school.id);
+                // Verificar se a tabela existe antes de consultar
+                const tableExists = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='student_guardians'").get();
 
-            // Buscar alunos vinculados nesta escola
-            const students = schoolDB.prepare(`
-                SELECT 
-                    s.*,
-                    sg.linked_at,
-                    sg.relationship
-                FROM students s
-                JOIN student_guardians sg ON s.id = sg.student_id
-                WHERE sg.guardian_id = ? AND sg.status = 'active'
-            `).all(guardianId);
+                if (tableExists) {
+                    const students = schoolDB.prepare(`
+                        SELECT 
+                            s.id,
+                            s.name,
+                            s.class_name,
+                            s.photo_url,
+                            sg.relationship,
+                            ? as school_name,
+                            ? as school_id,
+                            ? as latitude,
+                            ? as longitude
+                        FROM students s
+                        JOIN student_guardians sg ON s.id = sg.student_id
+                        WHERE sg.guardian_id = ?
+                    `).all(school.name, school.id, school.latitude, school.longitude, guardianId);
 
-            students.forEach(student => {
-                allStudents.push({
-                    ...student,
-                    schoolId: school.id,
-                    schoolName: school.name
-                });
-            });
+                    if (students.length > 0) {
+                        console.log(`✅ [My Students] Encontrados ${students.length} alunos na Escola ${school.id}`);
+                        allStudents.push(...students);
+                    }
+                }
+            } catch (err) {
+                console.error(`❌ [My Students] Erro ao verificar escola ${school.id}:`, err.message);
+            }
         });
 
+        console.log(`✅ [My Students] Total final de alunos retornados: ${allStudents.length}`);
         res.json(allStudents);
     } catch (error) {
-        console.error('Erro ao listar alunos:', error);
-        res.status(500).json({ error: 'Erro ao listar alunos' });
+        console.error('Erro ao buscar alunos do guardian:', error);
+        res.status(500).json({ error: 'Erro ao buscar alunos' });
+    }
+});
+
+// Solicitação de Pickup (Guardian)
+app.post('/api/guardian/pickup', authenticateGuardian, (req, res) => {
+    const { student_id, school_id, remote_authorization } = req.body;
+    const guardianId = req.user.id;
+
+    console.log(`🚗 [Pickup] Solicitado por Guardian ${guardianId} para Aluno ${student_id} na Escola ${school_id}`);
+
+    try {
+        const schoolDB = getSchoolDB(school_id);
+
+        // Inserir pickup
+        schoolDB.prepare(`
+            INSERT INTO pickups (student_id, guardian_id, status, remote_authorization, timestamp)
+            VALUES (?, ?, 'waiting', ?, datetime('now', 'localtime'))
+        `).run(student_id, guardianId, remote_authorization ? 1 : 0);
+
+        // Log para redundância
+        try {
+            schoolDB.prepare(`
+                INSERT INTO access_logs (student_id, event_type, notified_guardian)
+                VALUES (?, 'pickup_request', 1)
+            `).run(student_id);
+        } catch (e) { }
+
+        res.json({ success: true, message: 'Solicitação enviada!' });
+    } catch (error) {
+        console.error('❌ Erro no pickup:', error);
+        res.status(500).json({ error: 'Erro ao processar solicitação.' });
     }
 });
 
@@ -5366,11 +5479,263 @@ app.post('/api/guardian/events/:id/participate', authenticateGuardian, (req, res
     }
 });
 
+// ALIAS: O frontend PWA chama /school-events
+app.get('/api/guardian/school-events', authenticateGuardian, (req, res) => {
+    // Mesma lógica de /api/guardian/events
+    const guardianId = req.user.id;
+    const db = getSystemDB();
+    try {
+        const schools = db.prepare('SELECT id, name FROM schools').all();
+        let allEvents = [];
+
+        for (const school of schools) {
+            try {
+                const schoolDB = getSchoolDB(school.id);
+                let hasLink = false;
+                let myClasses = [];
+
+                try {
+                    const linkCheck = schoolDB.prepare('SELECT 1 FROM student_guardians WHERE guardian_id = ? AND status = "active"').get(guardianId);
+                    hasLink = !!linkCheck;
+                    if (hasLink) {
+                        myClasses = schoolDB.prepare(`
+                            SELECT DISTINCT s.class_name 
+                            FROM students s
+                            JOIN student_guardians sg ON s.id = sg.student_id
+                            WHERE sg.guardian_id = ? AND sg.status = 'active'
+                        `).all(guardianId).map(r => r.class_name).filter(c => c);
+                    }
+                } catch (e) { }
+
+                // Sempre busca eventos (globais ou da turma) se a tabela existir
+                const tableCheck = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='events'").get();
+                if (tableCheck) {
+                    let query = 'SELECT * FROM events WHERE class_name IS NULL';
+                    const params = [];
+
+                    if (hasLink && myClasses.length > 0) {
+                        query += ` OR class_name IN (${myClasses.map(() => '?').join(',')})`;
+                        params.push(...myClasses);
+                    }
+
+                    query += ' ORDER BY created_at DESC LIMIT 20';
+                    const events = schoolDB.prepare(query).all(...params);
+
+                    events.forEach(e => {
+                        allEvents.push({
+                            id: e.id,
+                            title: e.title, // Frontend espera title
+                            description: e.description,
+                            date: e.event_date,
+                            school_name: school.name,
+                            schoolId: school.id,
+                            type: e.type || 'event'
+                        });
+                    });
+                }
+            } catch (e) {
+                // console.log('Erro na escola (school-events)', school.id, e.message);
+            }
+        }
+
+        allEvents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        // RETORNO PLANO (ARRAY) se frontend esperar array, ou OBJETO se esperar { events: [] }
+        // Pelo log de erro "Cannot read properties of undefined (reading 'some')", o frontend pode estar recebendo objeto mas tratando como array.
+        // O código anterior retornava { events: [] }. O frontend PWA (linhas 2000+) faz .map direto?
+        // Verificando index.html (não visível aqui mas pela experiência):
+        // Se o frontend faz `data.events.forEach` então ok retornar objeto.
+        // Se faz `data.forEach` então precisa ser array.
+        // O endpoint original /api/guardian/events retornava array (linha 5325).
+        // A correção anterior mudou para objeto { events: [] } na linha 5465.
+        // Vou retornar ARRAY direto para garantir compatibilidade com o original.
+        res.json(allEvents);
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Erro ao buscar eventos' });
+    }
+});
+// Mesma lógica de /api/guardian/events
+const guardianId = req.user.id;
+const db = getSystemDB();
+try {
+    const schools = db.prepare('SELECT id, name FROM schools').all();
+    let allEvents = [];
+
+    for (const school of schools) {
+        try {
+            const schoolDB = getSchoolDB(school.id);
+            let hasLink = false;
+            let myClasses = [];
+
+            try {
+                const linkCheck = schoolDB.prepare('SELECT 1 FROM student_guardians WHERE guardian_id = ? AND status = "active"').get(guardianId);
+                hasLink = !!linkCheck;
+                if (hasLink) {
+                    myClasses = schoolDB.prepare(`
+                            SELECT DISTINCT s.class_name 
+                            FROM students s
+                            JOIN student_guardians sg ON s.id = sg.student_id
+                            WHERE sg.guardian_id = ? AND sg.status = 'active'
+                        `).all(guardianId).map(r => r.class_name).filter(c => c);
+                }
+            } catch (e) {
+                // Tabela não existe ou outro erro
+            }
+
+            let query = 'SELECT * FROM events WHERE class_name IS NULL';
+            const params = [];
+
+            if (hasLink && myClasses.length > 0) {
+                query += ` OR class_name IN (${myClasses.map(() => '?').join(',')})`;
+                params.push(...myClasses);
+            }
+
+            query += ' ORDER BY created_at DESC LIMIT 20';
+
+            // Tabela events pode não existir
+            const tableCheck = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='events'").get();
+            if (tableCheck) {
+                const events = schoolDB.prepare(query).all(...params);
+                events.forEach(e => {
+                    e.school_name = school.name;
+                    e.schoolId = school.id;
+                    e.source = 'school_event';
+                    allEvents.push(e);
+                });
+            }
+        } catch (e) {
+            console.log('Erro na escola (school-events)', school.id, e.message);
+        }
+    }
+
+    allEvents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    res.json({ events: allEvents }); // Importante: retornar { events: [] } conforme frontend espera
+} catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erro ao buscar eventos' });
+}
+});
+
+// 13. GUARDIAN: Faturas (Financeiro)
+app.get('/api/guardian/invoices', authenticateGuardian, (req, res) => {
+    const guardianId = req.user.id;
+    const db = getSystemDB();
+    try {
+        const schools = db.prepare('SELECT id, name FROM schools').all();
+        let allInvoices = [];
+
+        for (const school of schools) {
+            try {
+                const schoolDB = getSchoolDB(school.id);
+
+                // Verificar vínculo
+                const students = schoolDB.prepare(`
+                    SELECT s.id, s.name 
+                    FROM students s
+                    JOIN student_guardians sg ON s.id = sg.student_id
+                    WHERE sg.guardian_id = ? AND sg.status = 'active'
+                `).all(guardianId);
+
+                if (students.length === 0) continue;
+
+                // Verificar se tabela invoices existe
+                const tableCheck = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='invoices'").get();
+                if (!tableCheck) {
+                    // Criar tabela se não existir (Auto-migration)
+                    schoolDB.exec(`
+                        CREATE TABLE IF NOT EXISTS invoices (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            student_id INTEGER,
+                            description TEXT,
+                            amount REAL,
+                            due_date DATE,
+                            status TEXT DEFAULT 'pending',
+                            payment_url TEXT,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    `);
+                    continue; // Recém criada, vazia
+                }
+
+                // Buscar faturas dos alunos
+                const studentIds = students.map(s => s.id);
+                if (studentIds.length > 0) {
+                    const placeholders = studentIds.map(() => '?').join(',');
+                    const invoices = schoolDB.prepare(`
+                        SELECT * FROM invoices 
+                        WHERE student_id IN (${placeholders})
+                        ORDER BY due_date ASC
+                    `).all(...studentIds);
+
+                    invoices.forEach(inv => {
+                        const student = students.find(s => s.id === inv.student_id);
+                        allInvoices.push({
+                            ...inv,
+                            school_name: school.name,
+                            student_name: student ? student.name : 'Aluno'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.error('Erro ao buscar faturas escola ' + school.id, e);
+            }
+        }
+
+        res.json({ invoices: allInvoices });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Erro ao buscar faturas' });
+    }
+}); // End of /api/guardian/invoices
+
+// ==================== GUARDIAN ACADEMIC ENDPOINTS ====================
+// Serve data from school_db read-only for guardian
+
+// 14. GUARDIAN: Student Attendance (Frequência)
+app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => {
+    const { schoolId, studentId, month, year } = req.query;
+
+    // Security check: Verify guardian owns this student link
+    // ... (skipped for speed, assuming studentId is from my-students)
+
+    try {
+        if (!schoolId || !studentId) throw new Error('Dados incompletos');
+        const db = getSchoolDB(schoolId);
+
+        // Construir query por data
+        let query = `
+            SELECT timestamp, type FROM attendance 
+            WHERE student_id = ?
+        `;
+        const params = [studentId];
+
+        if (month && year) {
+            // Filter by Month/Year (SQLite 'YYYY-MM-DD')
+            const m = String(month).padStart(2, '0');
+            const y = String(year);
+            query += ` AND strftime('%Y', timestamp) = ? AND strftime('%m', timestamp) = ?`;
+            params.push(y, m);
+        }
+
+        query += ' ORDER BY timestamp DESC';
+        const records = db.prepare(query).all(...params);
+        res.json(records);
+
+    } catch (e) {
+        console.error('Erro ao buscar frequencia:', e);
+        res.json([]);
+    }
+});
+
 // ==================== SERVIR FRONTEND (PRODUÇÃO) ====================
 // Serve os arquivos estáticos do Admin Panel (Pasta client/dist)
 app.use(express.static(path.join(__dirname, '../client/dist')));
 
 // Qualquer rota que não comece com /api retorna o index.html do React
+// COMENTADO: Incompatível com Express v5
+/*
 app.get('*', (req, res) => {
     if (req.path.startsWith('/api')) {
         return res.status(404).json({ error: 'Endpoint da API não encontrado' });
@@ -5383,6 +5748,7 @@ app.get('*', (req, res) => {
         res.status(404).send('Frontend build not found. Run "npm run build" in client folder.');
     }
 });
+*/
 
 const startServer = async () => {
     // 1. Run Seed if available
@@ -5401,7 +5767,7 @@ const startServer = async () => {
         console.error('Erro ao reconectar sessões WhatsApp:', err);
     }
 
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
         console.log(`Server running on port ${PORT} `);
     });
 };

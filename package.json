@@ -5,9 +5,10 @@
   "main": "index.js",
   "scripts": {
     "start": "node server/server.js",
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "dev": "concurrently \"npm run server\" \"npm run client\" \"npm run guardian\"",
     "server": "cd server && node server.js",
     "client": "cd client && npm run dev",
+    "guardian": "cd guardian-web-pwa && npm run dev",
     "install:all": "npm install && cd server && npm install && cd client && npm install",
     "postinstall": "cd server && npm install",
     "test": "echo \"Error: no test specified\" && exit 1"

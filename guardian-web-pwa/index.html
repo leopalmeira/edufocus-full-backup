@@ -407,40 +407,97 @@
         }
 
         /* Login/Register */
+        /* Login/Register - Professional Redesign */
         .auth-container {
             min-height: 100vh;
             display: flex;
-            flex-direction: column;
-            background: #6366f1;
+            align-items: center;
+            justify-content: center;
+            background-image: url('bg-login.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            position: relative;
+            padding: 20px;
         }
 
-        .auth-header {
-            padding: 40px 20px 24px;
-            text-align: center;
-            color: white;
+        /* Overlay escuro para melhorar leitura e contraste sobre a foto */
+        .auth-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.70);
+            /* Dark Blue/Slate overlay */
+            backdrop-filter: blur(4px);
+            z-index: 1;
         }
 
-        .auth-logo {
-            font-size: 48px;
-            margin-bottom: 12px;
-        }
-
-        .auth-title {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 4px;
-        }
-
-        .auth-subtitle {
-            font-size: 13px;
-            opacity: 0.9;
+        /* Wrapper para centralizar e elevar sobre o overlay */
+        .auth-wrapper {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 440px;
+            margin: 0 auto;
         }
 
         .auth-content {
-            flex: 1;
-            background: white;
-            border-radius: 24px 24px 0 0;
-            padding: 24px 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            padding: 40px 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 32px;
+            color: #1e293b;
+        }
+
+        .auth-logo {
+            font-size: 56px;
+            margin-bottom: 12px;
+            line-height: 1;
+            /* Efeito de brilho no emoji/logo */
+            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+        }
+
+        .auth-title {
+            font-size: 28px;
+            font-weight: 800;
+            color: #1e293b;
+            /* Slate 800 */
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+        }
+
+        .auth-subtitle {
+            font-size: 15px;
+            color: #64748b;
+            /* Slate 500 */
+            font-weight: 500;
+        }
+
+        /* Estilização melhorada dos Forms */
+        .form-group {
+            margin-bottom: 20px;
         }
 
         .form-group {
@@ -1041,24 +1098,26 @@
         <!-- Login Screen -->
         <div id="loginScreen">
             <div class="auth-container">
-                <div class="auth-header">
-                    <div class="auth-logo">📱</div>
-                    <h1 class="auth-title">EduFocus</h1>
-                    <p class="auth-subtitle">Acompanhe seu filho</p>
-                </div>
-                <div class="auth-content">
-                    <div id="loginError" class="alert alert-error hidden"></div>
-                    <div class="form-group">
-                        <label class="label">Email</label>
-                        <input type="email" id="loginEmail" class="input" placeholder="seu@email.com">
-                    </div>
-                    <div class="form-group">
-                        <label class="label">Senha</label>
-                        <input type="password" id="loginPassword" class="input" placeholder="••••••••">
-                    </div>
-                    <button class="btn-primary" onclick="login()">Entrar</button>
-                    <div class="link">
-                        Não tem conta? <a href="#" onclick="showRegister()">Cadastre-se</a>
+                <div class="auth-wrapper">
+                    <div class="auth-content">
+                        <div class="auth-header">
+                            <div class="auth-logo">📱</div>
+                            <h1 class="auth-title">EduFocus</h1>
+                            <p class="auth-subtitle">Acompanhe seu filho</p>
+                        </div>
+                        <div id="loginError" class="alert alert-error hidden"></div>
+                        <div class="form-group">
+                            <label class="label">Email</label>
+                            <input type="email" id="loginEmail" class="input" placeholder="seu@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label class="label">Senha</label>
+                            <input type="password" id="loginPassword" class="input" placeholder="••••••••">
+                        </div>
+                        <button class="btn-primary" onclick="login()">Entrar</button>
+                        <div class="link">
+                            Não tem conta? <a href="#" onclick="showRegister()">Cadastre-se</a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1067,33 +1126,35 @@
         <!-- Register Screen -->
         <div id="registerScreen" class="hidden">
             <div class="auth-container">
-                <div class="auth-header">
-                    <div class="auth-logo">✨</div>
-                    <h1 class="auth-title">Criar Conta</h1>
-                    <p class="auth-subtitle">Preencha seus dados</p>
-                </div>
-                <div class="auth-content">
-                    <div id="registerError" class="alert alert-error hidden"></div>
-                    <div id="registerSuccess" class="alert alert-success hidden"></div>
-                    <div class="form-group">
-                        <label class="label">Nome Completo</label>
-                        <input type="text" id="regName" class="input" placeholder="João Silva">
-                    </div>
-                    <div class="form-group">
-                        <label class="label">Email</label>
-                        <input type="email" id="regEmail" class="input" placeholder="seu@email.com">
-                    </div>
-                    <div class="form-group">
-                        <label class="label">Telefone</label>
-                        <input type="tel" id="regPhone" class="input" placeholder="(11) 99999-9999">
-                    </div>
-                    <div class="form-group">
-                        <label class="label">Senha</label>
-                        <input type="password" id="regPassword" class="input" placeholder="••••••••">
-                    </div>
-                    <button class="btn-primary" onclick="register()">Criar Conta</button>
-                    <div class="link">
-                        <a href="#" onclick="showLogin()">← Voltar</a>
+                <div class="auth-wrapper">
+                    <div class="auth-content">
+                        <div class="auth-header">
+                            <div class="auth-logo">✨</div>
+                            <h1 class="auth-title">Criar Conta</h1>
+                            <p class="auth-subtitle">Preencha seus dados</p>
+                        </div>
+                        <div id="registerError" class="alert alert-error hidden"></div>
+                        <div id="registerSuccess" class="alert alert-success hidden"></div>
+                        <div class="form-group">
+                            <label class="label">Nome Completo</label>
+                            <input type="text" id="regName" class="input" placeholder="João Silva">
+                        </div>
+                        <div class="form-group">
+                            <label class="label">Email</label>
+                            <input type="email" id="regEmail" class="input" placeholder="seu@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label class="label">Telefone</label>
+                            <input type="tel" id="regPhone" class="input" placeholder="(11) 99999-9999">
+                        </div>
+                        <div class="form-group">
+                            <label class="label">Senha</label>
+                            <input type="password" id="regPassword" class="input" placeholder="••••••••">
+                        </div>
+                        <button class="btn-primary" onclick="register()">Criar Conta</button>
+                        <div class="link">
+                            <a href="#" onclick="showLogin()">← Voltar</a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1190,18 +1251,7 @@
                         </select>
                     </div>
 
-                    <div class="stats-grid" id="reportStats">
-                        <div class="stat-card">
-                            <div class="stat-icon">✅</div>
-                            <div class="stat-value" id="statPresent">0</div>
-                            <div class="stat-label">Presenças</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">❌</div>
-                            <div class="stat-value" id="statAbsent">0</div>
-                            <div class="stat-label">Faltas</div>
-                        </div>
-                    </div>
+                    <!-- Stats Grid Removed by Request -->
 
                     <!-- Calendar Controls -->
                     <div
@@ -1378,54 +1428,54 @@
                     <label class="label">Email</label>
                     <input type="email" id="settingsEmail" class="input" disabled>
                 </div>
-                <div class="form-group">
-                    <label class="label">Telefone</label>
-                    <input type="tel" id="settingsPhone" class="input">
-                </div>
-                <button class="btn-primary" onclick="testNotification()"
-                    style="background-color: #f59e0b; margin-top: 10px;">🔔 Testar Som/Notificação</button>
-                <button class="btn-secondary" onclick="logout()" style="margin-top: 10px;">Sair</button>
+                <label class="label">Telefone</label>
+                <input type="tel" id="settingsPhone" class="input">
             </div>
+            <!-- API URL removed for security -->
+            <button class="btn-primary" onclick="testNotification()"
+                style="background-color: #f59e0b; margin-top: 10px;">🔔 Testar Som/Notificação</button>
+            <button class="btn-secondary" onclick="logout()" style="margin-top: 10px;">Sair</button>
         </div>
+    </div>
 
-        <script>
-            function testNotification() {
-                // Desbloquear audio context se necessário
-                if (window.audioCtxGlobal && window.audioCtxGlobal.state === 'suspended') {
-                    window.audioCtxGlobal.resume();
-                }
-                const mock = {
-                    id: Math.floor(Math.random() * 10000),
-                    school_name: 'Escola Exemplo',
-                    student_name: 'Seu Filho',
-                    event_type: 'arrival',
-                    timestamp: new Date().toISOString(),
-                    photo_url: null,
-                    class_name: 'Teste de Som'
-                };
-                showNotificationOverlay(mock);
+    <script>
+        function testNotification() {
+            // Desbloquear audio context se necessário
+            if (window.audioCtxGlobal && window.audioCtxGlobal.state === 'suspended') {
+                window.audioCtxGlobal.resume();
             }
+            const mock = {
+                id: Math.floor(Math.random() * 10000),
+                school_name: 'Escola Exemplo',
+                student_name: 'Seu Filho',
+                event_type: 'arrival',
+                timestamp: new Date().toISOString(),
+                photo_url: null,
+                class_name: 'Teste de Som'
+            };
+            showNotificationOverlay(mock);
+        }
 
-            function loadSettings() {
-                // Carregar dados do responsável logado
-                if (user) {
-                    document.getElementById('settingsName').value = user.name || '';
-                    document.getElementById('settingsEmail').value = user.email || '';
-                    document.getElementById('settingsPhone').value = user.phone || '';
-                }
+        function loadSettings() {
+            // Carregar dados do responsável logado
+            if (user) {
+                document.getElementById('settingsName').value = user.name || '';
+                document.getElementById('settingsEmail').value = user.email || '';
+                document.getElementById('settingsPhone').value = user.phone || '';
             }
+        }
 
-            function logout() {
-                if (confirm('Deseja realmente sair?')) {
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    user = null;
-                    myStudentsData = [];
-                    stopNotificationPoller();
-                    showLogin();
-                }
+        function logout() {
+            if (confirm('Deseja realmente sair?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                user = null;
+                myStudentsData = [];
+                stopNotificationPoller();
+                showLogin();
             }
-        </script>
+        }
+    </script>
     </div>
 
     <!-- Bottom Navigation -->
@@ -1474,10 +1524,23 @@
 
     <script>
         // API Local (Porta 5000)
-        // Se estiver rodando localmente no PC, usa localhost. Se na rede, usa o IP da rede.
-        const API_URL = window.location.hostname === 'localhost'
+        // API Logic
+        const defaultApiUrl = window.location.hostname === 'localhost'
             ? 'http://localhost:5000/api'
             : `http://${window.location.hostname}:5000/api`;
+
+        // Check for override
+        const storedApiUrl = localStorage.getItem('custom_api_url');
+        const API_URL = storedApiUrl || defaultApiUrl;
+
+        function saveApiUrl() {
+            const val = document.getElementById('settingsApiUrl').value;
+            if (val) {
+                localStorage.setItem('custom_api_url', val);
+                alert('Endereço do servidor atualizado! O app será recarregado.');
+                window.location.reload();
+            }
+        }
 
         let user = null;
         let selectedSchool = null;
@@ -2102,6 +2165,7 @@
 
             selects.forEach(id => {
                 const el = document.getElementById(id);
+                // Populate if empty
                 if (el && el.options.length <= 1 && myStudentsData.length > 0) {
                     myStudentsData.forEach(s => {
                         const opt = document.createElement('option');
@@ -2109,13 +2173,12 @@
                         opt.textContent = s.name;
                         el.appendChild(opt);
                     });
+                }
 
-                    // Auto select first if available
-                    if (myStudentsData.length > 0) {
-                        el.value = myStudentsData[0].id;
-                        // Manually trigger for grades/reports listeners if attached
-                        el.dispatchEvent(new Event('change'));
-                    }
+                // FORCE selection if nothing selected and data exists
+                if (el && !el.value && myStudentsData.length > 0) {
+                    el.value = myStudentsData[0].id;
+                    el.dispatchEvent(new Event('change'));
                 }
             });
         }
@@ -2267,8 +2330,11 @@
                 }
             }
 
-            document.getElementById('statPresent').textContent = presentCount;
-            document.getElementById('statAbsent').textContent = absentCount;
+            const elPresent = document.getElementById('statPresent');
+            if (elPresent) elPresent.textContent = presentCount;
+
+            const elAbsent = document.getElementById('statAbsent');
+            if (elAbsent) elAbsent.textContent = absentCount;
         }
 
         async function loadGrades(studentId) {
@@ -2480,9 +2546,12 @@
             clearTimeout(studentTimeout);
             studentTimeout = setTimeout(async () => {
                 try {
-                    // Busca aluno na turma selecionada (endpoint público)
+                    const token = localStorage.getItem('token');
+                    // Busca aluno na turma selecionada (endpoint autenticado)
                     const url = `${API_URL}/guardian/schools/${selectedSchool.id}/students/search?name=${encodeURIComponent(query)}&className=${encodeURIComponent(selectedClass)}`;
-                    const res = await fetch(url);
+                    const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
                     const students = await res.json();
 
                     if (!resultsDiv) return;
@@ -2556,18 +2625,22 @@
 
                 if (!res.ok) {
                     if (res.status === 401 || res.status === 403) {
-                        // Token inválido - limpar e forçar re-login
                         localStorage.removeItem('token');
                         localStorage.removeItem('user');
                         user = null;
-                        errorDiv.textContent = '❌ Sessão expirada. Redirecionando para login...';
+                        errorDiv.textContent = '❌ Sessão expirada. Faça login novamente.';
                         errorDiv.classList.remove('hidden');
-                        setTimeout(() => {
-                            showLogin();
-                        }, 1500);
+                        setTimeout(() => showLogin(), 2000);
                         return;
                     }
-                    throw new Error(data.message || 'Erro ao vincular');
+
+                    // Tentar ler a mensagem de erro do JSON
+                    const errorData = data;
+                    const errorMessage = errorData.error || errorData.message || 'Erro desconhecido ao vincular';
+
+                    errorDiv.innerHTML = `❌ Erro: ${errorMessage}<br><small>Tente novamente ou contate a escola.</small>`;
+                    errorDiv.classList.remove('hidden');
+                    throw new Error(errorMessage);
                 }
 
                 successDiv.textContent = `✅ ${selectedStudent.name} vinculado com sucesso!`;
@@ -2680,11 +2753,22 @@
 
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/guardian/students`, {
+                // Correção: Endpoint correto '/my-students' e tratamento robusto da resposta
+                const res = await fetch(`${API_URL}/guardian/my-students`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const responseData = await res.json();
-                const children = responseData.data?.students || [];
+
+                let children = [];
+                const data = await res.json();
+
+                // Backend retorna array direto, mas mantemos compatibilidade se mudar
+                if (Array.isArray(data)) {
+                    children = data;
+                } else if (data.data?.students) {
+                    children = data.data.students;
+                } else if (data.students) {
+                    children = data.students;
+                }
 
                 // Save globally for use in reports/grades dropdown
                 myStudentsData = children;
@@ -2782,13 +2866,13 @@
 
                     if (infoDiv) {
                         const distText = dist < 1 ? `${distMeters.toFixed(0)}m` : `${dist.toFixed(1)}km`;
-                        const statusColor = distMeters <= 20 ? '#10b981' : (distMeters <= 200 ? '#f59e0b' : '#ef4444');
+                        const statusColor = distMeters <= 30 ? '#10b981' : (distMeters <= 200 ? '#f59e0b' : '#ef4444');
                         infoDiv.innerHTML = `<span style="color: ${statusColor};">📍 Você está a <b>${distText}</b> da escola</span>`;
                     }
 
                     if (btn) {
-                        // REGRA: Só ativa o botão se estiver a <= 20 metros
-                        if (distMeters <= 20) {
+                        // REGRA: Só ativa o botão se estiver a <= 30 metros
+                        if (distMeters <= 30) {
                             // PRÓXIMO - Ativar botão
                             btn.disabled = false;
                             btn.style.opacity = '1';
@@ -3115,7 +3199,15 @@
                 }
 
                 const data = await response.json();
-                const events = data.events || [];
+
+                // Tratar resposta: Array plano ou Objeto { events: [...] }
+                let events = [];
+                if (Array.isArray(data)) {
+                    events = data;
+                } else if (data.events && Array.isArray(data.events)) {
+                    events = data.events;
+                }
+
                 console.log(`✅ ${events.length} eventos recebidos.`);
 
                 if (events.length === 0) {
