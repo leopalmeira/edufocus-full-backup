@@ -30,8 +30,19 @@ function initSystemDB() {
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       address TEXT,
+      number TEXT,
+      zip_code TEXT,
+      latitude REAL,
+      longitude REAL,
+      custom_price REAL DEFAULT NULL,
       status TEXT DEFAULT 'active',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- System Settings
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     );
 
     -- Teachers (Global pool)
@@ -65,6 +76,17 @@ function initSystemDB() {
       phone TEXT,
       password TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Inspectors (School Inspectors)
+    CREATE TABLE IF NOT EXISTS inspectors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      school_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (school_id) REFERENCES schools(id)
     );
 
     -- Installation Rates (for technicians)
@@ -155,6 +177,12 @@ function initSystemDB() {
     systemDB.prepare('INSERT INTO installation_rates (cameras_count, rate) VALUES (?, ?)').run(3, 250);
     systemDB.prepare('INSERT INTO installation_rates (cameras_count, rate) VALUES (?, ?)').run(4, 310);
     systemDB.prepare('INSERT INTO installation_rates (cameras_count, rate) VALUES (?, ?)').run(5, 380);
+  }
+
+  // Insert default SaaS price if not exists
+  const hasSaasPrice = systemDB.prepare("SELECT COUNT(*) as count FROM system_settings WHERE key = 'saas_default_price'").get().count;
+  if (hasSaasPrice === 0) {
+    systemDB.prepare("INSERT INTO system_settings (key, value) VALUES ('saas_default_price', '6.50')").run();
   }
 }
 
@@ -276,6 +304,7 @@ function getSchoolDB(schoolId) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       class_id INTEGER NOT NULL,
       student_id INTEGER NOT NULL,
+      position INTEGER,
       position_x INTEGER,
       position_y INTEGER,
       period_start DATE,
@@ -449,17 +478,7 @@ function getSchoolDB(schoolId) {
       FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
     );
 
-    -- Pickups (Fila de Retirada)
-    CREATE TABLE IF NOT EXISTS pickups (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      student_id INTEGER NOT NULL,
-      guardian_id INTEGER NOT NULL,
-      status TEXT DEFAULT 'waiting', -- waiting, calling, completed
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      remote_authorization INTEGER DEFAULT 0,
-      FOREIGN KEY (student_id) REFERENCES students(id),
-      FOREIGN KEY (guardian_id) REFERENCES guardians(id)
-    );
+
 
     -- Índices para melhor performance
     CREATE INDEX IF NOT EXISTS idx_employee_attendance_date 
@@ -522,6 +541,18 @@ function getSchoolDB(schoolId) {
       confirmed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
       FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+    );
+
+    -- Pickups (Fila de Retirada - Now in School DB)
+    -- Remover FK guardian_id pois guardians estão no SystemDB
+    CREATE TABLE IF NOT EXISTS pickups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      guardian_id INTEGER NOT NULL,
+      status TEXT DEFAULT 'waiting', -- waiting, calling, completed
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      remote_authorization INTEGER DEFAULT 0,
+      FOREIGN KEY (student_id) REFERENCES students(id)
     );
   `);
 

@@ -113,6 +113,7 @@ export default function EmotionMonitor({ onEmotionsUpdate, isActive, roomId, sch
                         stats: response.data.emotion_counts,
                         metrics: response.data.metrics,
                         students: response.data.students,
+                        responses: response.data.responses,
                         timestamp: response.data.timestamp
                     });
                 }

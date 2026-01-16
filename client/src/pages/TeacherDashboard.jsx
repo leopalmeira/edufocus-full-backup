@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Menu, BarChart3, Users, MessageSquare, Shuffle, Settings, LogOut, Play, Pause, Camera, TrendingUp, AlertTriangle, CheckCircle, Clock, Brain, BookOpen, Bell, FileText, Calendar, HelpCircle, RefreshCw, Download, Eye, Activity, Zap, Target, Send, X } from 'lucide-react';
 import api from '../api/axios';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import EmotionMonitor from '../components/EmotionMonitor';
 import '../styles/TeacherDashboardFixed.css';
@@ -44,6 +45,8 @@ export default function TeacherDashboard() {
 
     // Estado para dados reais de emoções da câmera
     const [emotionData, setEmotionData] = useState(null);
+    const [capturedAnswers, setCapturedAnswers] = useState({}); // {studentId: 'A'|'B'|'C'|'D'}
+    const [currentResponsesCount, setCurrentResponsesCount] = useState(0);
 
     useEffect(() => {
         document.body.classList.add('force-landscape');
@@ -96,96 +99,89 @@ export default function TeacherDashboard() {
         loadClassData();
     }, [selectedClass]);
 
-    // Atualização de métricas em tempo real - DESATIVADO (agora usa dados reais da câmera)
-    /* useEffect(() => {
-        if (!monitoring || !selectedClass || students.length === 0) return;
+    const handleEmotionsUpdate = (data) => {
+        setEmotionData(data);
 
-        const updateMetrics = () => {
-            // Simular captura de dados da câmera
-            const newMetrics = {
-                attention: Math.min(100, Math.floor(Math.random() * 20) + 70),
-                disposition: Math.min(100, Math.floor(Math.random() * 25) + 60),
-                performance: Math.min(100, Math.floor(Math.random() * 20) + 75),
-                engagement: Math.min(100, Math.floor(Math.random() * 15) + 80)
-            };
+        if (data.stats) {
+            const total = data.totalFaces || 1;
 
-            setMetrics(newMetrics);
+            // Cálculo dinâmico de métricas baseado na distribuição emocional
+            // Feliz/Neutro = Bom Foco
+            const positiveEmotions = (data.stats.happy || 0) + (data.stats.neutral || 0) + (data.stats.surprise || 0);
+            const negativeEmotions = (data.stats.angry || 0) + (data.stats.sad || 0) + (data.stats.disgust || 0) + (data.stats.fear || 0);
 
-            // Atualizar emoções dos alunos
-            const emotionTypes = ['feliz', 'triste', 'raiva', 'medo', 'surpresa', 'nojo', 'neutro'];
-            const newEmotions = {};
-
-            students.forEach(student => {
-                const emotion = emotionTypes[Math.floor(Math.random() * emotionTypes.length)];
-                newEmotions[student.id] = emotion;
+            setMetrics({
+                attention: Math.min(100, Math.round((positiveEmotions / total) * 100)),
+                disposition: Math.min(100, Math.round(((data.stats.happy || 0) / total) * 100 + 20)),
+                performance: metrics.performance, // Mantém o anterior ou calcula se tiver dados de polls
+                engagement: Math.min(100, Math.round((total / (students.length || 1)) * 100))
             });
 
-            setEmotions(newEmotions);
+            // Atualizar distribuição para as barras de progresso
+            setDistribution({
+                high: data.stats.happy || 0,
+                medium: data.stats.neutral || 0,
+                low: negativeEmotions
+            });
 
-            // Calcular distribuição
-            const high = students.filter(s => {
-                const emotion = newEmotions[s.id];
-                return emotion === 'feliz' || emotion === 'surpresa';
-            }).length;
-
-            const low = students.filter(s => {
-                const emotion = newEmotions[s.id];
-                return emotion === 'triste' || emotion === 'raiva' || emotion === 'medo';
-            }).length;
-
-            const medium = students.length - high - low;
-
-            setDistribution({ high, medium, low });
-
-            // Gerar alertas
-            const newAlerts = [];
-            if (low >= 3) {
-                newAlerts.push({
-                    type: 'attention',
-                    title: 'Baixa atenção prolongada',
-                    description: `${low} alunos com emoções negativas`,
-                    time: 'Agora'
-                });
-            }
-            if (newMetrics.disposition < 65) {
-                newAlerts.push({
-                    type: 'disposition',
-                    title: 'Queda na disposição',
-                    description: 'Redução detectada nos últimos minutos',
-                    time: '2 min'
-                });
-            }
-            if (newMetrics.engagement < 75) {
-                newAlerts.push({
-                    type: 'behavior',
-                    title: 'Baixo engajamento',
-                    description: 'Turma dispersa na atividade atual',
-                    time: '5 min'
+            // Atualizar respostas de enquete em tempo real se ativa
+            if (data.responses && pollActive) {
+                const fingerMap = { 1: 'A', 2: 'B', 3: 'C', 4: 'D' };
+                setCapturedAnswers(prev => {
+                    const next = { ...prev };
+                    let changed = false;
+                    Object.entries(data.responses).forEach(([sid, fingers]) => {
+                        const letter = fingerMap[fingers];
+                        if (letter && next[sid] !== letter) {
+                            next[sid] = letter;
+                            changed = true;
+                        }
+                    });
+                    if (changed) {
+                        setCurrentResponsesCount(Object.keys(next).length);
+                        return next;
+                    }
+                    return prev;
                 });
             }
 
-            setAlerts(newAlerts);
-        };
+            // Gerar alertas automáticos se muitos alunos estiverem desatentos
+            if (negativeEmotions >= 3 && monitoring) {
+                const newAlert = {
+                    title: 'Dispersão Detectada',
+                    description: `${negativeEmotions} alunos apresentam sinais de desatenção ou emoções negativas.`,
+                    type: 'warning'
+                };
 
-        updateMetrics();
-        const interval = setInterval(updateMetrics, 3000);
-
-        return () => clearInterval(interval);
-    }, [monitoring, selectedClass, students]); */
+                // Evitar duplicatas exageradas
+                setAlerts(prev => {
+                    const exists = prev.some(a => a.description === newAlert.description);
+                    if (exists) return prev;
+                    return [newAlert, ...prev].slice(0, 5);
+                });
+            }
+        }
+    };
 
     const startPoll = async (poll) => {
+        setCapturedAnswers({});
+        setCurrentResponsesCount(0);
         setCurrentPoll(poll);
+
+        // FORÇAR MONITORAMENTO ATIVO PARA A CAMERA APARECER
+        setMonitoring(true);
+
         setPollActive(true);
-        setCountdown(5);
+        setCountdown(10);
 
         try {
             const pollRes = await api.post('/teacher/polls', {
                 class_id: selectedClass.id,
                 question: poll.question,
-                optionA: poll.optionA,
-                optionB: poll.optionB,
-                optionC: poll.optionC,
-                optionD: poll.optionD,
+                optionA: poll.option1,
+                optionB: poll.option2,
+                optionC: poll.option3,
+                optionD: poll.option4,
                 correct_answer: poll.correct
             });
 
@@ -209,30 +205,35 @@ export default function TeacherDashboard() {
 
     const capturePollResponses = async (pollId, poll) => {
         try {
-            const responses = students.map(student => ({
-                studentId: student.id,
-                studentName: student.name,
-                answer: ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)],
-                isCorrect: false
-            }));
-
-            responses.forEach(r => {
-                r.isCorrect = r.answer === poll.correct;
+            const responses = (students || []).map(student => {
+                const answer = (capturedAnswers || {})[student.id];
+                return {
+                    studentId: student.id,
+                    studentName: student.name,
+                    answer: answer || null,
+                    isCorrect: String(answer) === String(poll?.correct)
+                };
             });
 
-            await api.post(`/teacher/polls/${pollId}/responses`, { responses });
+            const validResponses = responses.filter(r => r.answer !== null);
 
-            setPollResults(prev => [...prev, {
+            await api.post(`/teacher/polls/${pollId}/responses`, { responses: validResponses });
+
+            setPollResults(prev => [...(prev || []), {
                 pollId,
-                question: poll.question,
-                responses,
+                question: poll?.question || 'Enquete sem título',
+                responses: validResponses,
                 timestamp: new Date()
             }]);
 
-            alert('✅ Respostas capturadas com sucesso!');
-            setPollActive(false);
+            alert(`✅ Enquete finalizada! ${validResponses.length} respostas capturadas.`);
         } catch (err) {
             console.error('Erro ao registrar respostas:', err);
+            alert('⚠️ Erro ao registrar respostas no servidor, mas a sessão foi encerrada.');
+        } finally {
+            setPollActive(false);
+            setCapturedAnswers({});
+            setCurrentResponsesCount(0);
         }
     };
 
@@ -297,79 +298,6 @@ export default function TeacherDashboard() {
         } catch (err) {
             console.error('Erro ao marcar mensagem como lida:', err);
         }
-    };
-
-    // Processar dados reais de emoções da câmera
-    const handleEmotionsUpdate = (data) => {
-        setEmotionData(data);
-
-        if (!data || !data.stats) return;
-
-        // Calcular métricas baseadas nas emoções reais
-        const { stats, totalFaces } = data;
-
-        // Atenção: baseada em emoções positivas vs negativas
-        const positiveEmotions = (stats.happy || 0) + (stats.surprised || 0);
-        const negativeEmotions = (stats.sad || 0) + (stats.angry || 0) + (stats.fearful || 0);
-        const attention = totalFaces > 0
-            ? Math.round(((positiveEmotions + stats.neutral) / totalFaces) * 100)
-            : 0;
-
-        // Disposição: baseada principalmente em felicidade
-        const disposition = totalFaces > 0
-            ? Math.round(((stats.happy || 0) / totalFaces) * 100)
-            : 0;
-
-        // Engajamento: inverso de neutro e negativo
-        const engagement = totalFaces > 0
-            ? Math.round((1 - ((stats.neutral + negativeEmotions) / totalFaces)) * 100)
-            : 0;
-
-        // Performance: média geral
-        const performance = Math.round((attention + disposition + engagement) / 3);
-
-        setMetrics({
-            attention: Math.min(100, attention),
-            disposition: Math.min(100, disposition),
-            performance: Math.min(100, performance),
-            engagement: Math.min(100, engagement)
-        });
-
-        // Atualizar distribuição
-        const high = positiveEmotions;
-        const low = negativeEmotions;
-        const medium = totalFaces - high - low;
-
-        setDistribution({ high, medium, low });
-
-        // Gerar alertas baseados em dados reais
-        const newAlerts = [];
-        if (negativeEmotions >= 3) {
-            newAlerts.push({
-                type: 'attention',
-                title: 'Emoções negativas detectadas',
-                description: `${negativeEmotions} alunos com tristeza, raiva ou medo`,
-                time: 'Agora'
-            });
-        }
-        if (disposition < 50) {
-            newAlerts.push({
-                type: 'disposition',
-                title: 'Baixa felicidade na turma',
-                description: 'Poucos alunos demonstrando alegria',
-                time: 'Agora'
-            });
-        }
-        if (stats.neutral > totalFaces * 0.7) {
-            newAlerts.push({
-                type: 'behavior',
-                title: 'Turma muito neutra',
-                description: 'Alunos podem estar entediados',
-                time: 'Agora'
-            });
-        }
-
-        setAlerts(newAlerts);
     };
 
     if (loading) return <div className="teacher-dashboard-wrapper"><div style={{ padding: '2rem', textAlign: 'center', color: '#fff' }}>Carregando...</div></div>;
@@ -462,154 +390,225 @@ export default function TeacherDashboard() {
                     {/* DASHBOARD */}
                     {activeTab === 'dashboard' && (
                         <div className="fade-in">
-                            {/* Header */}
-                            <div className="content-header">
-                                <div className="page-title">
-                                    <h1>Dashboard da Turma</h1>
-                                    <div className="page-subtitle">
-                                        Monitoramento em tempo real - {selectedClass.name}
+                            {/* Header Profissional */}
+                            <div className="content-header-premium">
+                                <div className="header-title-group">
+                                    <div className="title-icon-wrapper">
+                                        <BarChart3 size={32} />
+                                    </div>
+                                    <div>
+                                        <h1>Painel de Comando</h1>
+                                        <p>Monitoramento Analítico • {selectedClass.name} • {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</p>
                                     </div>
                                 </div>
 
-                                <div className="header-actions">
+                                <div className="header-controls-premium">
+                                    <div className="session-timer">
+                                        <Clock size={16} />
+                                        <span>01:24:05</span>
+                                    </div>
                                     <button
-                                        className={`btn-icon ${monitoring ? 'monitoring-active' : ''}`}
-                                        title={monitoring ? "Parar Monitoramento" : "Iniciar Monitoramento"}
+                                        className={`btn-monitor ${monitoring ? 'active' : ''}`}
                                         onClick={() => setMonitoring(!monitoring)}
-                                        style={{
-                                            width: 'auto',
-                                            padding: '0.5rem 1rem',
-                                            borderRadius: '8px',
-                                            gap: '0.5rem',
-                                            background: monitoring ? 'var(--danger)' : 'var(--accent-primary)',
-                                            color: 'white'
-                                        }}
                                     >
-                                        {monitoring ? <><Pause size={18} /> Parar</> : <><Camera size={18} /> Monitorar</>}
+                                        {monitoring ? (
+                                            <><span className="pulse-red"></span> Parar Monitoramento</>
+                                        ) : (
+                                            <><Camera size={18} /> Iniciar Análise</>
+                                        )}
                                     </button>
-                                    <button className="btn-icon" title="Atualizar" onClick={() => window.location.reload()}>
-                                        <RefreshCw size={20} />
+                                    <div className="divider-v"></div>
+                                    <button className="btn-small-round" title="Atualizar Dados" onClick={() => window.location.reload()}>
+                                        <RefreshCw size={18} />
                                     </button>
-                                    <button className="btn-icon" title="Notificações">
-                                        <Bell size={20} />
-                                        {alerts.length > 0 && <span className="notification-badge">{alerts.length}</span>}
-                                    </button>
-                                    <button className="btn-icon" title="Exportar">
-                                        <Download size={20} />
+                                    <button className="btn-small-round" title="Alertas">
+                                        <Bell size={18} />
+                                        {alerts.length > 0 && <span className="badge-glow">{alerts.length}</span>}
                                     </button>
                                 </div>
                             </div>
 
-                            {monitoring && (
-                                <div style={{
-                                    marginBottom: '1.5rem',
-                                    padding: '0.75rem 1rem',
-                                    background: 'rgba(239, 68, 68, 0.1)',
-                                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                                    borderRadius: '8px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem',
-                                    fontSize: '0.9rem'
-                                }}>
-                                    <span className="pulse-badge">● AO VIVO</span>
-                                    <span style={{ color: 'var(--text-secondary)' }}>Sistema de monitoramento ativo</span>
+                            {/* Alertas Críticos (Banner flutuante se houver muitos) */}
+                            {alerts.length > 0 && monitoring && (
+                                <div className="live-alert-banner">
+                                    <div className="alert-aura"></div>
+                                    <AlertTriangle size={20} className="shake-anim" />
+                                    <marquee behavior="scroll" direction="left">
+                                        {alerts.map((a, i) => (
+                                            <span key={i} className="alert-text">
+                                                <strong>{a.title}:</strong> {a.description} •
+                                            </span>
+                                        ))}
+                                    </marquee>
                                 </div>
                             )}
 
-                            {/* Monitor de Emoções com Câmera */}
+                            {/* Monitor de Emoções com Câmera (Invisível/Logístico) */}
                             <EmotionMonitor
                                 onEmotionsUpdate={handleEmotionsUpdate}
                                 isActive={monitoring}
+                                roomId={selectedClass.id}
+                                schoolId={teacher.school_id}
                                 students={students}
                             />
 
-                            {/* Métricas Principais */}
-                            <div className="metrics-grid">
-                                <MetricCard
-                                    title="Atenção da Turma"
-                                    value={metrics.attention}
-                                    icon={<Brain size={24} />}
-                                    color="#3498db"
-                                    change={metrics.attention > 75 ? 'positive' : 'negative'}
-                                />
-                                <MetricCard
-                                    title="Disposição da Turma"
-                                    value={metrics.disposition}
-                                    icon={<Activity size={24} />}
-                                    color="#2ecc71"
-                                    change={metrics.disposition > 65 ? 'positive' : 'negative'}
-                                />
-                                <MetricCard
-                                    title="Desempenho"
-                                    value={metrics.performance}
-                                    icon={<TrendingUp size={24} />}
-                                    color="#9b59b6"
-                                    change={metrics.performance > 75 ? 'positive' : 'negative'}
-                                />
-                                <MetricCard
-                                    title="Engajamento"
-                                    value={metrics.engagement}
-                                    icon={<Zap size={24} />}
-                                    color="#f1c40f"
-                                    change={metrics.engagement > 80 ? 'positive' : 'negative'}
-                                />
-                            </div>
-
-                            {/* Informações da Turma */}
-                            <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-                                <h3 className="section-title">
-                                    <Target size={20} /> Informações da Turma
-                                </h3>
-                                <div className="info-grid">
-                                    <InfoItem label="Matéria Atual" value="Matemática" />
-                                    <InfoItem label="Horário da Aula" value="08:30 - 10:10" />
-                                    <InfoItem label="Total de Alunos" value={students.length} />
-                                    <InfoItem label="Alunos Presentes" value={students.length - Math.floor(Math.random() * 3)} />
-                                    <InfoItem label="Status da Aula" value="Em Andamento" color="#2ecc71" />
-                                    <InfoItem label="Próxima Aula" value="Português" />
-                                </div>
-                            </div>
-
-                            {/* Alertas */}
-                            {alerts.length > 0 && (
-                                <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                        <h3 className="section-title">
-                                            <AlertTriangle size={20} /> Alertas Recentes
-                                        </h3>
-                                        <div className="alertas-count">{alerts.length}</div>
+                            {/* Grid Superior: Métricas e Visualização em Tempo Real */}
+                            <div className="dashboard-top-grid">
+                                {/* Métricas Principais com Sparklines */}
+                                <div className="metrics-column">
+                                    <div className="premium-metrics-grid">
+                                        <PremiumMetricCard
+                                            title="Nível de Foco"
+                                            value={metrics.attention}
+                                            icon={<Brain size={20} />}
+                                            color="#60a5fa"
+                                            glowColor="rgba(96, 165, 250, 0.4)"
+                                            data={[40, 45, 60, 55, 70, 75, metrics.attention]}
+                                        />
+                                        <PremiumMetricCard
+                                            title="Clima da Turma"
+                                            value={metrics.disposition}
+                                            icon={<Activity size={20} />}
+                                            color="#34d399"
+                                            glowColor="rgba(52, 211, 153, 0.4)"
+                                            data={[50, 55, 52, 58, 62, 60, metrics.disposition]}
+                                        />
+                                        <PremiumMetricCard
+                                            title="Engajamento"
+                                            value={metrics.engagement}
+                                            icon={<Zap size={20} />}
+                                            color="#fbbf24"
+                                            glowColor="rgba(251, 191, 36, 0.4)"
+                                            data={[30, 40, 45, 55, 65, 75, metrics.engagement]}
+                                        />
+                                        <PremiumMetricCard
+                                            title="Performance"
+                                            value={metrics.performance}
+                                            icon={<Target size={20} />}
+                                            color="#a78bfa"
+                                            glowColor="rgba(167, 139, 250, 0.4)"
+                                            data={[60, 62, 65, 68, 72, 75, metrics.performance]}
+                                        />
                                     </div>
-                                    {alerts.map((alert, idx) => (
-                                        <AlertItem key={idx} alert={alert} />
-                                    ))}
                                 </div>
-                            )}
 
-                            {/* Distribuição */}
-                            <div className="glass-panel" style={{ padding: '1.5rem' }}>
-                                <h3 className="section-title">
-                                    <BarChart3 size={20} /> Distribuição por Nível
-                                </h3>
-                                <div className="distribuicao-grid">
-                                    <DistributionItem
-                                        value={distribution.high}
-                                        label="Alta Atenção"
-                                        percentage={Math.round((distribution.high / students.length) * 100)}
-                                        color="alta"
-                                    />
-                                    <DistributionItem
-                                        value={distribution.medium}
-                                        label="Média Atenção"
-                                        percentage={Math.round((distribution.medium / students.length) * 100)}
-                                        color="media"
-                                    />
-                                    <DistributionItem
-                                        value={distribution.low}
-                                        label="Baixa Atenção"
-                                        percentage={Math.round((distribution.low / students.length) * 100)}
-                                        color="baixa"
-                                    />
+                                {/* Visualização Analítica Central */}
+                                <div className="analytics-card glass-panel-premium">
+                                    <div className="card-header">
+                                        <h3><Activity size={18} /> Insights em Tempo Real</h3>
+                                        <div className="live-pill">AO VIVO</div>
+                                    </div>
+
+                                    <div className="analytics-content">
+                                        {monitoring ? (
+                                            <div className="radar-container">
+                                                <div className="radar-circle">
+                                                    <div className="radar-sweep"></div>
+                                                    <div className="central-icon"><Eye size={32} /></div>
+                                                    {/* Pontos representando alunos ativos */}
+                                                    {students.slice(0, 12).map((s, i) => (
+                                                        <div
+                                                            key={i}
+                                                            className="radar-dot"
+                                                            style={{
+                                                                top: `${20 + Math.random() * 60}%`,
+                                                                left: `${20 + Math.random() * 60}%`,
+                                                                animationDelay: `${i * 0.2}s`
+                                                            }}
+                                                        ></div>
+                                                    ))}
+                                                </div>
+                                                <div className="radar-info">
+                                                    <div className="info-stat">
+                                                        <span className="label">Presença Ativa</span>
+                                                        <span className="value">{emotionData ? emotionData.totalFaces : 0} ({students.length})</span>
+                                                    </div>
+                                                    <div className="info-stat">
+                                                        <span className="label">Status</span>
+                                                        <span className="value green">Analisando Comportamento</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="empty-analytics">
+                                                <div className="empty-glow"></div>
+                                                <Play size={48} style={{ opacity: 0.3 }} />
+                                                <p>Inicie o monitoramento para visualizar dados analíticos da turma</p>
+                                                <button className="btn btn-primary" onClick={() => setMonitoring(true)}>Ativar Câmera</button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Grid Inferior: Distribuição e Informações Detalhadas */}
+                            <div className="dashboard-bottom-grid">
+                                {/* Distribuição Emocional */}
+                                <div className="distribution-card glass-panel-premium">
+                                    <div className="card-header">
+                                        <h3><BarChart3 size={18} /> Perfil Comportamental</h3>
+                                    </div>
+                                    <div className="distribution-bars">
+                                        <div className="dist-item">
+                                            <div className="dist-info">
+                                                <span>Alta Atenção</span>
+                                                <span className="dist-value">{distribution.high} alunos</span>
+                                            </div>
+                                            <div className="premium-progress-bar">
+                                                <div className="bar-bg"></div>
+                                                <div className="bar-fill blue" style={{ width: `${(distribution.high / (students.length || 1)) * 100}%` }}></div>
+                                                <div className="bar-glow blue"></div>
+                                            </div>
+                                        </div>
+                                        <div className="dist-item">
+                                            <div className="dist-info">
+                                                <span>Média Atenção</span>
+                                                <span className="dist-value">{distribution.medium} alunos</span>
+                                            </div>
+                                            <div className="premium-progress-bar">
+                                                <div className="bar-bg"></div>
+                                                <div className="bar-fill yellow" style={{ width: `${(distribution.medium / (students.length || 1)) * 100}%` }}></div>
+                                                <div className="bar-glow yellow"></div>
+                                            </div>
+                                        </div>
+                                        <div className="dist-item">
+                                            <div className="dist-info">
+                                                <span>Baixa Atenção</span>
+                                                <span className="dist-value">{distribution.low} alunos</span>
+                                            </div>
+                                            <div className="premium-progress-bar">
+                                                <div className="bar-bg"></div>
+                                                <div className="bar-fill red" style={{ width: `${(distribution.low / (students.length || 1)) * 100}%` }}></div>
+                                                <div className="bar-glow red"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Contexto Acadêmico */}
+                                <div className="context-card glass-panel-premium">
+                                    <div className="card-header">
+                                        <h3><BookOpen size={18} /> Contexto Acadêmico</h3>
+                                    </div>
+                                    <div className="context-grid">
+                                        <div className="context-item">
+                                            <div className="ctx-label">Matéria</div>
+                                            <div className="ctx-value">Matemática</div>
+                                            <div className="ctx-tag blue">Aula 05/12</div>
+                                        </div>
+                                        <div className="context-item">
+                                            <div className="ctx-label">Tópico Atual</div>
+                                            <div className="ctx-value">Equações Quadráticas</div>
+                                        </div>
+                                        <div className="context-item">
+                                            <div className="ctx-label">Duração</div>
+                                            <div className="ctx-value">50 min restantes</div>
+                                        </div>
+                                        <div className="context-item">
+                                            <div className="ctx-label">Próxima Aula</div>
+                                            <div className="ctx-value">História</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -628,10 +627,14 @@ export default function TeacherDashboard() {
                     {activeTab === 'interactivity' && (
                         <InteractivityTab
                             onStartPoll={startPoll}
+                            currentResponsesCount={currentResponsesCount}
                             pollActive={pollActive}
                             currentPoll={currentPoll}
                             countdown={countdown}
                             pollResults={pollResults}
+                            monitoring={monitoring}
+                            setMonitoring={setMonitoring}
+                            selectedClass={selectedClass}
                         />
                     )}
 
@@ -678,6 +681,57 @@ export default function TeacherDashboard() {
 }
 
 // Componentes auxiliares
+// Componente de Métrica Premium com Sparkline
+function PremiumMetricCard({ title, value, icon, color, glowColor, data = [] }) {
+    return (
+        <div className="premium-metric-card" style={{ '--accent-color': color, '--glow-color': glowColor }}>
+            <div className="card-inner">
+                <div className="card-top">
+                    <div className="icon-box" style={{ backgroundColor: `${color}20`, color: color }}>
+                        {icon}
+                    </div>
+                    <div className="trend-badge">
+                        <TrendingUp size={12} />
+                        <span>+12%</span>
+                    </div>
+                </div>
+
+                <div className="card-body">
+                    <div className="value-group">
+                        <span className="current-value">{value}%</span>
+                        <span className="value-label">{title}</span>
+                    </div>
+
+                    <div className="sparkline-wrapper">
+                        <svg viewBox="0 0 100 30" preserveAspectRatio="none">
+                            <defs>
+                                <linearGradient id={`grad-${title.replace(/\s+/g, '')}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stopColor={color} stopOpacity="0.4" />
+                                    <stop offset="100%" stopColor={color} stopOpacity="0" />
+                                </linearGradient>
+                            </defs>
+                            <path
+                                d={`M ${data.map((v, i) => `${(i / (data.length - 1)) * 100} ${30 - (v / 100) * 30}`).join(' L ')}`}
+                                fill="none"
+                                stroke={color}
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                            <path
+                                d={`M ${data.map((v, i) => `${(i / (data.length - 1)) * 100} ${30 - (v / 100) * 30}`).join(' L ')} L 100 30 L 0 30 Z`}
+                                fill={`url(#grad-${title.replace(/\s+/g, '')})`}
+                            />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            <div className="card-glow"></div>
+        </div>
+    );
+}
+
+// Manter componentes antigos para compatibilidade se necessário, ou remover
 function MetricCard({ title, value, icon, color, change }) {
     const [showDetails, setShowDetails] = useState(false);
 
@@ -948,24 +1002,57 @@ function StudentsTab({ students, emotions, onSelectStudent }) {
     );
 }
 
-function InteractivityTab({ onStartPoll, pollActive, currentPoll, countdown, pollResults }) {
+function InteractivityTab({
+    onStartPoll, pollActive, currentPoll, countdown, pollResults,
+    currentResponsesCount, monitoring, setMonitoring, selectedClass
+}) {
     const [poll, setPoll] = useState({
         question: '',
-        optionA: '',
-        optionB: '',
-        optionC: '',
-        optionD: '',
-        correct: 'A'
+        option1: '',
+        option2: '',
+        option3: '',
+        option4: '',
+        correct: '1'
     });
 
     const handleSubmit = () => {
-        if (!poll.question || !poll.optionA || !poll.optionB || !poll.optionC || !poll.optionD) {
+        if (!poll.question || !poll.option1 || !poll.option2 || !poll.option3 || !poll.option4) {
             alert('⚠️ Preencha todos os campos!');
             return;
         }
         onStartPoll(poll);
-        setPoll({ question: '', optionA: '', optionB: '', optionC: '', optionD: '', correct: 'A' });
+        setPoll({ question: '', option1: '', option2: '', option3: '', option4: '', correct: '1' });
     };
+
+    // Efeito para iniciar/parar a câmera no servidor Python
+    useEffect(() => {
+        const manageCamera = async () => {
+            const pythonApiUrl = 'http://localhost:5001/api/analysis';
+            try {
+                if (monitoring && selectedClass?.id) {
+                    console.log('🔵 Iniciando câmera para sala:', selectedClass.id);
+                    await axios.post(`${pythonApiUrl}/start`, {
+                        room_id: selectedClass.id,
+                        school_id: 1, // Fallback safe
+                        camera_url: 0 // Força webcam local
+                    });
+                } else if (!monitoring && selectedClass?.id) {
+                    console.log('🔴 Parando câmera...');
+                    await axios.post(`${pythonApiUrl}/stop`, { room_id: selectedClass.id });
+                }
+            } catch (error) {
+                console.error('Erro na câmera Python:', error);
+            }
+        };
+        manageCamera();
+
+        // Cleanup ao desmontar
+        return () => {
+            if (monitoring && selectedClass?.id) {
+                axios.post('http://localhost:5001/api/analysis/stop', { room_id: selectedClass.id }).catch(() => { });
+            }
+        };
+    }, [monitoring, selectedClass]);
 
     return (
         <div className="fade-in">
@@ -988,7 +1075,7 @@ function InteractivityTab({ onStartPoll, pollActive, currentPoll, countdown, pol
                             onChange={(e) => setPoll({ ...poll, question: e.target.value })}
                         />
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                            {['A', 'B', 'C', 'D'].map(opt => (
+                            {[1, 2, 3, 4].map(opt => (
                                 <input
                                     key={opt}
                                     type="text"
@@ -1007,56 +1094,121 @@ function InteractivityTab({ onStartPoll, pollActive, currentPoll, countdown, pol
                                 onChange={(e) => setPoll({ ...poll, correct: e.target.value })}
                                 style={{ width: 'auto' }}
                             >
-                                {['A', 'B', 'C', 'D'].map(opt => (
+                                {[1, 2, 3, 4].map(opt => (
                                     <option key={opt} value={opt}>{opt}</option>
                                 ))}
                             </select>
                         </div>
-                        <button className="btn btn-primary" onClick={handleSubmit}>
-                            <Camera size={20} /> Iniciar Enquete com Countdown
-                        </button>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button className="btn btn-primary" onClick={handleSubmit} style={{ flex: 1 }}>
+                                <Camera size={20} /> Iniciar Enquete Oficial
+                            </button>
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => setMonitoring(!monitoring)}
+                                style={{ border: monitoring ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.1)' }}
+                            >
+                                {monitoring ? 'Desligar Câmera de Teste' : 'Testar Câmera de IA'}
+                            </button>
+                        </div>
                     </div>
+                </div>
+            )}
+
+            {monitoring && !pollActive && (
+                <div className="glass-panel" style={{ padding: '1rem', marginBottom: '2rem', border: '1px solid var(--accent-primary)' }}>
+                    <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: 'var(--accent-primary)', fontWeight: 'bold' }}>MODO DE TESTE: Verifique se os nomes aparecem sobre os rostos</span>
+                        <button className="btn btn-icon" onClick={() => setMonitoring(false)}><X size={18} /></button>
+                    </div>
+                    <img
+                        src={`http://localhost:5001/api/analysis/video/${selectedClass?.id || 1}`}
+                        alt="AI Preview"
+                        style={{ width: '100%', maxHeight: '400px', objectFit: 'contain', borderRadius: '8px', background: '#000' }}
+                    />
                 </div>
             )}
 
             {pollActive && currentPoll && (
-                <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2))' }}>
-                    <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                        <Clock size={48} style={{ color: 'var(--accent-primary)', marginBottom: '1rem' }} />
-                        <h2 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>
-                            {countdown}s
-                        </h2>
-                        <div style={{ fontSize: '1.1rem', color: 'var(--text-secondary)' }}>
-                            Capturando respostas via câmera...
-                        </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
+                    <div className="glass-panel" style={{ padding: '1rem', border: '2px solid var(--accent-primary)', position: 'relative', overflow: 'hidden', minHeight: '400px' }}>
+                        <div style={{ position: 'absolute', top: '1rem', left: '1rem', zIndex: 10, background: 'red', color: 'white', padding: '4px 10px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>LIVE AI FEED</div>
+                        <img
+                            src={`http://localhost:5001/api/analysis/video/${selectedClass?.id || 1}`}
+                            alt="AI Analysis"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px', background: '#000' }}
+                            onError={(e) => {
+                                e.target.src = 'https://via.placeholder.com/640x480?text=Aguardando+Servidor+IA...';
+                            }}
+                        />
                     </div>
-                    <div style={{ fontSize: '1.3rem', textAlign: 'center', marginBottom: '1.5rem', fontWeight: '600' }}>
-                        {currentPoll.question}
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                        {['A', 'B', 'C', 'D'].map(opt => (
-                            <div key={opt} style={{
-                                padding: '1.5rem',
-                                background: currentPoll.correct === opt ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.1)',
-                                borderRadius: '12px',
-                                textAlign: 'center'
-                            }}>
-                                <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{opt}</div>
-                                <div>{currentPoll[`option${opt}`]}</div>
+                    <div className="glass-panel" style={{ padding: '2rem', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2))', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-1rem' }}>
+                                <button
+                                    className="btn btn-ghost"
+                                    style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}
+                                    onClick={() => {
+                                        setPollActive(false);
+                                        setCountdown(0);
+                                    }}
+                                >
+                                    Cancelar Enquete
+                                </button>
                             </div>
-                        ))}
+                            <Clock size={40} style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }} />
+                            <h2 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>
+                                {countdown}s
+                            </h2>
+                            <div style={{ fontSize: '1.1rem', color: 'var(--text-secondary)' }}>
+                                Capturando respostas via visão computacional...
+                            </div>
+                            {currentResponsesCount > 0 && (
+                                <div style={{
+                                    marginTop: '1rem',
+                                    display: 'inline-block',
+                                    padding: '8px 16px',
+                                    background: 'rgba(16, 185, 129, 0.2)',
+                                    color: '#10b981',
+                                    borderRadius: '20px',
+                                    fontSize: '0.9rem',
+                                    fontWeight: '600',
+                                    border: '1px solid #10b981',
+                                    animation: 'pulse 2s infinite'
+                                }}>
+                                    {currentResponsesCount} aluno{currentResponsesCount > 1 ? 's' : ''} já respondeu{currentResponsesCount > 1 ? 'ram' : ''} ✋
+                                </div>
+                            )}
+                        </div>
+                        <div style={{ fontSize: '1.3rem', textAlign: 'center', marginBottom: '1.5rem', fontWeight: '600' }}>
+                            {currentPoll.question}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                            {[1, 2, 3, 4].map(opt => (
+                                <div key={opt} style={{
+                                    padding: '1.5rem',
+                                    background: String(currentPoll?.correct) === String(opt) ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.1)',
+                                    borderRadius: '12px',
+                                    textAlign: 'center',
+                                    border: String(currentPoll?.correct) === String(opt) ? '1px solid #10b981' : '1px solid transparent'
+                                }}>
+                                    <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>{opt}</div>
+                                    <div>{currentPoll?.[`option${opt}`] || '-'}</div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
 
-            {pollResults.length > 0 && (
+            {(pollResults || []).length > 0 && (
                 <div className="glass-panel" style={{ padding: '2rem' }}>
                     <h3 style={{ marginBottom: '1.5rem' }}>Histórico de Enquetes</h3>
                     {pollResults.map((pr, idx) => (
                         <div key={idx} style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                            <div style={{ fontWeight: 'bold', marginBottom: '1rem' }}>{pr.question}</div>
+                            <div style={{ fontWeight: 'bold', marginBottom: '1rem' }}>{pr?.question}</div>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                {pr.responses.length} respostas • {pr.responses.filter(r => r.isCorrect).length} corretas
+                                {(pr?.responses || []).length} respostas • {(pr?.responses || []).filter(r => r?.isCorrect).length} corretas
                             </div>
                         </div>
                     ))}

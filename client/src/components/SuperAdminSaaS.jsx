@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Save, Edit2, X, TrendingUp, Users, Building2, Search, AlertCircle } from 'lucide-react';
+import api from '../api/axios';
 
 const SuperAdminSaaS = () => {
     const [config, setConfig] = useState({ default_price: 6.50 });
@@ -17,12 +18,15 @@ const SuperAdminSaaS = () => {
     const fetchData = async () => {
         try {
             const [configRes, schoolsRes] = await Promise.all([
-                fetch('http://localhost:5000/api/saas/admin/config').then(r => r.json()),
-                fetch('http://localhost:5000/api/saas/admin/schools').then(r => r.json())
+                api.get('/saas/admin/config'),
+                api.get('/saas/admin/schools')
             ]);
-            setConfig(configRes);
-            setGlobalPrice(configRes.default_price.toString());
-            setSchools(schoolsRes);
+
+            setConfig(configRes.data);
+            if (configRes.data && configRes.data.default_price !== undefined) {
+                setGlobalPrice(configRes.data.default_price.toString());
+            }
+            setSchools(schoolsRes.data || []);
         } catch (error) {
             console.error("Erro ao carregar dados SaaS:", error);
         } finally {
@@ -32,14 +36,13 @@ const SuperAdminSaaS = () => {
 
     const handleUpdateGlobal = async () => {
         try {
-            await fetch('http://localhost:5000/api/saas/admin/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ default_price: parseFloat(globalPrice) })
+            await api.post('/saas/admin/config', {
+                default_price: parseFloat(globalPrice)
             });
             alert("Preço global atualizado!");
             fetchData();
         } catch (error) {
+            console.error("Erro ao atualizar preço global:", error);
             alert("Erro ao atualizar preço global");
         }
     };
@@ -48,14 +51,13 @@ const SuperAdminSaaS = () => {
         if (!editingSchool) return;
         try {
             const price = newPrice === '' ? null : parseFloat(newPrice);
-            await fetch(`http://localhost:5000/api/saas/admin/school/${editingSchool.id}/price`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ custom_price: price })
+            await api.put(`/saas/admin/school/${editingSchool.id}/price`, {
+                custom_price: price
             });
             setEditingSchool(null);
             fetchData();
         } catch (error) {
+            console.error("Erro ao atualizar escola:", error);
             alert("Erro ao atualizar escola");
         }
     };

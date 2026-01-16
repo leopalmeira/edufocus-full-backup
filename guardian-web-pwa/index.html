@@ -10,23 +10,76 @@
     <style>
         :root {
             --primary: #2563eb;
-            /* Blue 600 */
-            --primary-dark: #1e40af;
-            /* Blue 800 */
-            --bg-body: #f1f5f9;
-            /* Slate 100 */
-            --surface: #ffffff;
-            --text-main: #0f172a;
-            /* Slate 900 */
+            --primary-dark: #1d4ed8;
+            --secondary: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg-body: #f8fafc;
+            --bg-card: #ffffff;
+            --text-main: #1e293b;
             --text-secondary: #64748b;
-            /* Slate 500 */
-            --border: #e2e8f0;
-            /* Slate 200 */
-            --radius-lg: 16px;
             --radius-md: 12px;
-            --radius-sm: 8px;
-            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --radius-lg: 20px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
+
+        @keyframes badge-attention {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scale(1.3);
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+                opacity: 1;
+            }
+        }
+
+        .nav-badge {
+            position: absolute;
+            top: 2px;
+            right: 50%;
+            margin-right: -25px;
+            background: var(--danger);
+            color: white;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            animation: badge-attention 1.5s ease forwards;
+            z-index: 10;
+        }
+
+        @keyframes pulse-soft {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
 
         * {
             margin: 0;
@@ -250,7 +303,6 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        /* Professional Child Card Styles */
         .child-card-prof {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -264,6 +316,99 @@
             position: relative;
             overflow: hidden;
             /* Contain children */
+            transition: all 0.3s ease;
+        }
+
+        /* CALLING ANIMATION - When inspector is calling the student */
+        .child-card-prof.calling-animation {
+            border: 3px solid #f59e0b !important;
+            box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.3), 0 0 30px rgba(245, 158, 11, 0.4) !important;
+            animation: calling-pulse 1.5s ease-in-out infinite;
+        }
+
+        .child-card-prof.calling-animation::before {
+            content: '📢 SENDO CHAMADO!';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            text-align: center;
+            padding: 8px;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            animation: calling-flash 0.8s ease-in-out infinite;
+            z-index: 10;
+        }
+
+        .child-card-prof.calling-animation .child-card-header {
+            margin-top: 36px;
+        }
+
+        @keyframes calling-pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.3), 0 0 30px rgba(245, 158, 11, 0.4);
+            }
+
+            50% {
+                transform: scale(1.02);
+                box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.2), 0 0 50px rgba(245, 158, 11, 0.6);
+            }
+        }
+
+        @keyframes calling-flash {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        /* Waiting for call animation */
+        .waiting-call-animation {
+            animation: waiting-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes waiting-pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.85;
+                transform: scale(0.98);
+            }
+        }
+
+        /* Calling button animation */
+        .calling-btn-animation {
+            animation: calling-btn-pulse 0.8s ease-in-out infinite !important;
+        }
+
+        @keyframes calling-btn-pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                box-shadow: 0 4px 25px rgba(245, 158, 11, 0.6);
+            }
+
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 8px 40px rgba(245, 158, 11, 0.9);
+            }
         }
 
         .child-card-header {
@@ -1265,8 +1410,31 @@
                         <button class="btn-icon" onclick="changeReportMonth(1)">▶</button>
                     </div>
 
+                    <!-- Stat Cards - Presenças e Faltas -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                        <div onclick="showAttendanceModal('present')"
+                            style="background: linear-gradient(135deg, #10b981, #059669); padding: 20px; border-radius: 16px; text-align: center; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); cursor: pointer; transition: transform 0.2s;">
+                            <div style="font-size: 36px; font-weight: 900; color: white;" id="presenceCount">0</div>
+                            <div
+                                style="font-size: 13px; color: rgba(255,255,255,0.9); font-weight: 600; margin-top: 4px;">
+                                ✅ Presenças</div>
+                            <div style="font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 8px;">Clique para ver
+                                detalhes</div>
+                        </div>
+                        <div onclick="showAttendanceModal('absent')"
+                            style="background: linear-gradient(135deg, #ef4444, #dc2626); padding: 20px; border-radius: 16px; text-align: center; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3); cursor: pointer; transition: transform 0.2s;">
+                            <div style="font-size: 36px; font-weight: 900; color: white;" id="absenceCount">0</div>
+                            <div
+                                style="font-size: 13px; color: rgba(255,255,255,0.9); font-weight: 600; margin-top: 4px;">
+                                ❌ Faltas</div>
+                            <div style="font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 8px;">Clique para ver
+                                detalhes</div>
+                        </div>
+                    </div>
+
                     <!-- Calendar Grid -->
-                    <div class="calendar-grid">
+                    <div class="calendar-grid"
+                        style="background: white; padding: 16px; border-radius: 16px; border: 1px solid #e5e7eb;">
                         <div class="calendar-header">D</div>
                         <div class="calendar-header">S</div>
                         <div class="calendar-header">T</div>
@@ -1281,11 +1449,11 @@
                     <div
                         style="display: flex; gap: 20px; justify-content: center; margin-top: 20px; padding: 15px; background: white; border-radius: 12px; border: 1px solid #e5e7eb;">
                         <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
-                            <div style="width: 16px; height: 16px; background: #d1fae5; border-radius: 4px;"></div>
+                            <div style="width: 16px; height: 16px; background: #10b981; border-radius: 4px;"></div>
                             Presente
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
-                            <div style="width: 16px; height: 16px; background: #fee2e2; border-radius: 4px;"></div>
+                            <div style="width: 16px; height: 16px; background: #ef4444; border-radius: 4px;"></div>
                             Ausente
                         </div>
                     </div>
@@ -1496,9 +1664,10 @@
             <div class="nav-icon">💲</div>
             <div class="nav-label">Pagamentos</div>
         </div>
-        <div class="nav-item" onclick="navigate('messages')">
+        <div class="nav-item" onclick="navigate('messages')" style="position: relative;">
             <div class="nav-icon">💬</div>
             <div class="nav-label">Mensagens</div>
+            <div id="bottom-nav-badge" class="nav-badge" style="display: none;">0</div>
         </div>
         <div class="nav-item" onclick="navigate('settings')">
             <div class="nav-icon">⚙️</div>
@@ -1642,6 +1811,7 @@
                 const token = localStorage.getItem('token');
                 if (!token) return;
 
+                // Check regular notifications (arrival/departure)
                 const res = await fetch(`${API_URL}/guardian/check-notifications`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -1657,12 +1827,92 @@
                     return;
                 }
 
-                if (!res.ok) return;
+                if (res.ok) {
+                    const data = await res.json();
+                    // O servidor retorna { notification } com uma única notificação se houver
+                    if (data.notification) {
+                        showNotificationOverlay(data.notification);
+                    }
+                }
 
-                const data = await res.json();
-                // O servidor retorna { notification } com uma única notificação se houver
-                if (data.notification) {
-                    showNotificationOverlay(data.notification);
+                // Check active pickups (when inspector calls the student - show on card)
+                try {
+                    const pickupRes = await fetch(`${API_URL}/guardian/active-pickups`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (pickupRes.ok) {
+                        const activePickups = await pickupRes.json();
+
+                        // Get all student IDs that are currently being called
+                        const callingStudentIds = activePickups.map(p => p.student_id);
+
+                        // Reset cards that are NOT being called anymore
+                        document.querySelectorAll('.child-card-prof.calling-animation').forEach(card => {
+                            const container = card.querySelector('[class*="pickup-container-"]');
+                            if (container) {
+                                const match = container.className.match(/pickup-container-(\d+)/);
+                                if (match && !callingStudentIds.includes(parseInt(match[1]))) {
+                                    card.classList.remove('calling-animation');
+                                    card.dataset.notified = '';
+
+                                    // Reset button to normal state
+                                    const btn = document.getElementById(`pickup-btn-${match[1]}`);
+                                    if (btn) {
+                                        btn.style.background = '';
+                                        btn.style.boxShadow = '';
+                                        btn.disabled = false;
+                                        btn.innerHTML = '✅ Estou na Escola - Notificar Chegada!';
+                                        btn.classList.remove('calling-btn-animation');
+                                        btn.classList.remove('waiting-call-animation');
+                                    }
+                                }
+                            }
+                        });
+
+                        // Activate calling animation for students being called
+                        if (activePickups && activePickups.length > 0) {
+                            activePickups.forEach(pickup => {
+                                const card = document.querySelector(`.pickup-container-${pickup.student_id}`)?.closest('.child-card-prof');
+                                const btn = document.getElementById(`pickup-btn-${pickup.student_id}`);
+                                const remoteBtn = document.getElementById(`remote-btn-${pickup.student_id}`);
+
+                                if (card) {
+                                    card.classList.add('calling-animation');
+
+                                    // Hide remote button
+                                    if (remoteBtn) remoteBtn.style.display = 'none';
+
+                                    // Hide distance info
+                                    const distInfo = document.getElementById(`dist-info-${pickup.student_id}`);
+                                    if (distInfo) distInfo.style.display = 'none';
+
+                                    // Update button to show "SENDO CHAMADO!" - laranja puro, APENAS ISSO
+                                    if (btn) {
+                                        btn.disabled = true;
+                                        btn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                                        btn.style.boxShadow = '0 4px 25px rgba(245, 158, 11, 0.6)';
+                                        btn.style.color = 'white';
+                                        btn.style.border = '3px solid #fbbf24';
+                                        btn.style.fontSize = '16px';
+                                        btn.style.fontWeight = '800';
+                                        btn.style.padding = '18px';
+                                        btn.innerHTML = '📢 ALUNO SENDO CHAMADO NA SALA!';
+                                        btn.classList.remove('waiting-call-animation');
+                                        btn.classList.add('calling-btn-animation');
+                                    }
+
+                                    // Play sound only if first time (no popup)
+                                    if (!card.dataset.notified) {
+                                        card.dataset.notified = 'true';
+                                        playNotificationSound();
+                                    }
+                                }
+                            });
+                        }
+                    }
+                } catch (e) {
+                    // Silencioso
                 }
             } catch (error) {
                 // Silencioso
@@ -1670,6 +1920,108 @@
                 isFetching = false;
             }
         }
+
+        // Notificação quando o inspetor chama o aluno
+        function showPickupCallingNotification(notif) {
+            // Se estiver em cooldown, ignora
+            if (isCooldown) return;
+
+            // Remover overlay anterior se existir
+            const existingOverlay = document.getElementById('notification-overlay');
+            if (existingOverlay) existingOverlay.remove();
+
+            // Tela fullscreen
+            const overlay = document.createElement('div');
+            overlay.id = 'notification-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: linear-gradient(135deg, #1e3a5f 0%, #0c1929 100%);
+                z-index: 99999;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+                font-family: 'Inter', sans-serif;
+            `;
+
+            overlay.innerHTML = `
+                <div style="text-align: center; animation: pulse-scale 1s infinite alternate;">
+                    <div style="font-size: 100px; margin-bottom: 20px;">📢</div>
+                    <h1 style="font-size: 28px; font-weight: 900; color: #10b981; margin: 0 0 10px 0; text-transform: uppercase;">
+                        Aluno Sendo Chamado!
+                    </h1>
+                    <h2 style="font-size: 36px; font-weight: 900; color: white; margin: 0 0 20px 0;">
+                        ${notif.student_name || 'Seu filho(a)'}
+                    </h2>
+                    <p style="font-size: 18px; color: #94a3b8; margin: 0 0 30px 0;">
+                        O inspetor está chamando na sala de aula.<br>
+                        Aguarde na portaria!
+                    </p>
+                    <button onclick="this.parentElement.parentElement.remove()" style="
+                        padding: 16px 40px;
+                        font-size: 18px;
+                        font-weight: 700;
+                        background: linear-gradient(135deg, #10b981, #059669);
+                        color: white;
+                        border: none;
+                        border-radius: 16px;
+                        cursor: pointer;
+                        box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+                    ">
+                        ✅ Entendido
+                    </button>
+                </div>
+                <style>
+                    @keyframes pulse-scale {
+                        from { transform: scale(1); }
+                        to { transform: scale(1.02); }
+                    }
+                </style>
+            `;
+
+            document.body.appendChild(overlay);
+
+            // Tocar som de notificação
+            playNotificationSound();
+
+            // Ativa cooldown
+            isCooldown = true;
+            setTimeout(() => isCooldown = false, 10000);
+
+            // Auto-remover após 15 segundos
+            setTimeout(() => {
+                if (document.getElementById('notification-overlay')) {
+                    overlay.remove();
+                }
+            }, 15000);
+        }
+
+        function playNotificationSound() {
+            try {
+                const context = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = context.createOscillator();
+                const gainNode = context.createGain();
+
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, context.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(440, context.currentTime + 0.3);
+
+                gainNode.gain.setValueAtTime(0.3, context.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.3);
+
+                oscillator.connect(gainNode);
+                gainNode.connect(context.destination);
+
+                oscillator.start();
+                oscillator.stop(context.currentTime + 0.3);
+            } catch (e) {
+                console.log('Audio não suportado');
+            }
+        }
+
+
 
 
         let isCooldown = false; // Cooldown global para evitar spam sonoro
@@ -2120,6 +2472,75 @@
             }).join('');
         }
 
+        // --- LOAD CHILDREN (Home Screen) ---
+        async function loadChildren() {
+            const childrenList = document.getElementById('childrenList');
+            if (!childrenList) return;
+
+            childrenList.innerHTML = '<div style="text-align: center; padding: 40px; color: #9ca3af;">Carregando seus filhos...</div>';
+
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/guardian/my-students`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Erro ao buscar alunos');
+
+                const data = await res.json();
+                myStudentsData = data.students || [];
+
+                if (myStudentsData.length === 0) {
+                    childrenList.innerHTML = `
+                        <div style="text-align: center; padding: 60px 20px;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">👨‍👩‍👧‍👦</div>
+                            <h3 style="font-size: 18px; font-weight: 600; color: #111827; margin-bottom: 8px;">Nenhum filho vinculado</h3>
+                            <p style="font-size: 14px; color: #6b7280;">Entre em contato com a escola para vincular seus filhos.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Renderizar lista de filhos
+                childrenList.innerHTML = myStudentsData.map(student => `
+                    <div class="child-card" style="cursor: pointer;" onclick="viewStudentDetails(${student.id}, ${student.school_id})">
+                        <div style="display: flex; align-items: center; gap: 16px;">
+                            <div style="width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 700;">
+                                ${student.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 4px;">${student.name}</div>
+                                <div style="font-size: 13px; color: #6b7280;">${student.class_name || 'Sem turma'}</div>
+                                <div style="font-size: 12px; color: #9ca3af; margin-top: 2px;">📍 ${student.school_name}</div>
+                            </div>
+                            <div style="color: #6366f1; font-size: 20px;">→</div>
+                        </div>
+                    </div>
+                `).join('');
+
+                console.log('✅ Carregados', myStudentsData.length, 'alunos com localização da escola');
+
+            } catch (e) {
+                console.error('Erro ao carregar filhos:', e);
+                childrenList.innerHTML = '<div style="text-align:center; padding:20px; color:#ef4444;">Erro ao carregar dados.</div>';
+            }
+        }
+
+        function viewStudentDetails(studentId, schoolId) {
+            const student = myStudentsData.find(s => s.id === studentId && s.school_id === schoolId);
+            if (!student) return;
+
+            alert(`
+Aluno: ${student.name}
+Turma: ${student.class_name || 'Não definida'}
+Escola: ${student.school_name}
+Endereço: ${student.school_address || ''} ${student.school_number || ''}
+CEP: ${student.school_zip_code || ''}
+GPS: ${student.school_latitude}, ${student.school_longitude}
+            `);
+        }
+
+
 
 
 
@@ -2149,7 +2570,10 @@
                 populateAcademicSelects();
                 // Force load if student selected
                 const sel = document.getElementById('reportStudentSelect');
-                if (sel && sel.value) loadReportStudent(sel.value);
+                if (sel) {
+                    if (!sel.value && myStudentsData.length > 0) sel.value = myStudentsData[0].id;
+                    if (sel.value) loadReportStudent(sel.value);
+                }
             } else if (tab === 'grades') {
                 document.getElementById('tabGradesContent').classList.remove('hidden');
                 populateAcademicSelects();
@@ -2210,7 +2634,8 @@
 
                 currentAttendanceData = data || [];
                 renderCalendar();
-                updateStats();
+                renderCalendar();
+                // updateStats(); // Removed: renderCalendar already updates stats correctly
 
             } catch (e) {
                 console.error("Erro ao carregar frequencia:", e);
@@ -2240,53 +2665,66 @@
                 container.innerHTML += `<div class="calendar-day day-empty"></div>`;
             }
 
+            // Count for stat cards
+            let presenceCount = 0;
+            let absenceCount = 0;
+            window.lastPresenceDays = [];
+            window.lastAbsenceDays = [];
+
             // Days
+            const today = new Date();
             for (let d = 1; d <= daysInMonth; d++) {
-                // Check attendance
-                // Format YYYY-MM-DD to match
-                // We need to check if any record in currentAttendanceData matches this day
                 const checkDate = new Date(year, month, d);
-                // Simple string match YYYY-MM-DD
                 const yyyy = year;
                 const mm = String(month + 1).padStart(2, '0');
                 const dd = String(d).padStart(2, '0');
                 const dateStr = `${yyyy}-${mm}-${dd}`;
 
-                // Assume attendance record timestamp contains the date
                 const records = currentAttendanceData.filter(r => r.timestamp.startsWith(dateStr));
 
-                let className = 'day-neutral'; // Default (future or no info)
-
-                // Logic: 
-                // If date is in future: neutral/empty
-                // If date is past/today AND has 'arrival' -> Present
-                // If date is past/today AND NO 'arrival' -> Absent (Weekdays only?)
-
                 const isWeekend = (checkDate.getDay() === 0 || checkDate.getDay() === 6);
-                const isFuture = checkDate > new Date();
+                const isFuture = checkDate > today;
+                const isPresent = records.length > 0;
 
-                let isPresent = records.some(r => r.type === 'arrival');
+                let bgColor = '';
+                let textColor = '';
+                let className = '';
 
                 if (!isFuture && !isWeekend) {
                     if (isPresent) {
-                        className = 'day-present'; // defined in CSS
+                        bgColor = '#10b981';
+                        textColor = 'white';
+                        className = 'day-present';
+                        presenceCount++;
+                        window.lastPresenceDays.push(d);
                     } else {
-                        // Only mark absent if it's a weekday in the past
-                        // Simple logic: If today and no record yet, maybe not arrived. 
-                        // If stricly past day, absent.
-                        // Let's mark absent for simplicity
+                        bgColor = '#ef4444';
+                        textColor = 'white';
                         className = 'day-absent';
+                        absenceCount++;
+                        window.lastAbsenceDays.push(d);
                     }
+                } else if (isFuture) {
+                    bgColor = '#f3f4f6';
+                    textColor = '#9ca3af';
+                } else {
+                    // Weekend
+                    bgColor = '#f9fafb';
+                    textColor = '#d1d5db';
                 }
 
-                if (isFuture) className = '';
-
                 container.innerHTML += `
-                    <div class="calendar-day ${className}" style="${className === '' ? 'background: #f3f4f6; color: #9ca3af;' : ''}">
+                    <div class="calendar-day ${className}" style="background: ${bgColor}; color: ${textColor}; font-weight: 600;">
                         ${d}
                     </div>
                 `;
             }
+
+            // Update stat cards
+            const presenceEl = document.getElementById('presenceCount');
+            const absenceEl = document.getElementById('absenceCount');
+            if (presenceEl) presenceEl.textContent = presenceCount;
+            if (absenceEl) absenceEl.textContent = absenceCount;
         }
 
         function updateStats() {
@@ -2335,6 +2773,86 @@
 
             const elAbsent = document.getElementById('statAbsent');
             if (elAbsent) elAbsent.textContent = absentCount;
+        }
+
+        // Modal para mostrar calendário completo
+        function showAttendanceModal(type) {
+            const monthLabel = document.getElementById('reportMonthLabel').textContent;
+            const yearLabel = document.getElementById('reportYearLabel').textContent;
+            const isPresent = type === 'present';
+            const days = isPresent ? (window.lastPresenceDays || []) : (window.lastAbsenceDays || []);
+            const bgColor = isPresent ? '#10b981' : '#ef4444';
+            const title = isPresent ? '✅ Dias de Presença' : '❌ Dias de Falta';
+            const emoji = isPresent ? '✅' : '❌';
+
+            // Create modal
+            const modal = document.createElement('div');
+            modal.id = 'attendance-modal';
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.7); z-index: 99999;
+                display: flex; align-items: center; justify-content: center;
+                padding: 20px; animation: fadeIn 0.2s ease;
+            `;
+
+            // Build days list with calendar grid
+            let calendarHTML = '';
+            if (days.length === 0) {
+                calendarHTML = `<p style="text-align: center; color: #6b7280; padding: 20px;">Nenhum registro encontrado</p>`;
+            } else {
+                calendarHTML = `
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 10px;">
+                        ${days.map(day => `
+                            <div style="
+                                width: 48px; height: 48px;
+                                background: ${bgColor};
+                                color: white;
+                                border-radius: 12px;
+                                display: flex; align-items: center; justify-content: center;
+                                font-size: 18px; font-weight: 700;
+                                box-shadow: 0 2px 8px ${isPresent ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'};
+                            ">${day}</div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            modal.innerHTML = `
+                <div style="
+                    background: white; border-radius: 24px; width: 100%; max-width: 400px;
+                    max-height: 80vh; overflow: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+                ">
+                    <div style="
+                        background: ${bgColor}; padding: 24px; border-radius: 24px 24px 0 0;
+                        text-align: center;
+                    ">
+                        <div style="font-size: 48px; margin-bottom: 8px;">${emoji}</div>
+                        <h2 style="color: white; font-size: 20px; font-weight: 800; margin: 0;">${title}</h2>
+                        <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 8px 0 0 0;">
+                            ${monthLabel} ${yearLabel}
+                        </p>
+                    </div>
+                    <div style="padding: 20px;">
+                        <p style="text-align: center; color: #374151; font-weight: 600; margin-bottom: 16px;">
+                            ${days.length} ${days.length === 1 ? 'dia' : 'dias'} registrado${days.length === 1 ? '' : 's'}
+                        </p>
+                        ${calendarHTML}
+                    </div>
+                    <div style="padding: 20px; border-top: 1px solid #e5e7eb;">
+                        <button onclick="document.getElementById('attendance-modal').remove()"
+                            style="
+                                width: 100%; padding: 16px; background: ${bgColor}; color: white;
+                                border: none; border-radius: 12px; font-size: 16px; font-weight: 700;
+                                cursor: pointer; box-shadow: 0 4px 15px ${isPresent ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'};
+                            ">
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
         }
 
         async function loadGrades(studentId) {
@@ -2747,9 +3265,9 @@
             showLogin();
         }
 
-        async function loadChildren() {
+        async function loadChildren(silent = false) {
             const div = document.getElementById('childrenList');
-            div.innerHTML = '<div style="text-align: center; padding: 20px;">Carregando...</div>';
+            if (!silent) div.innerHTML = '<div style="text-align: center; padding: 20px;">Carregando...</div>';
 
             try {
                 const token = localStorage.getItem('token');
@@ -2758,19 +3276,16 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
-                let children = [];
                 const data = await res.json();
+                const children = Array.isArray(data) ? data : (data.students || data.data?.students || []);
 
-                // Backend retorna array direto, mas mantemos compatibilidade se mudar
-                if (Array.isArray(data)) {
-                    children = data;
-                } else if (data.data?.students) {
-                    children = data.data.students;
-                } else if (data.students) {
-                    children = data.students;
+                // PERFORMANCE: Só re-renderiza se os dados mudarem de fato
+                const dataHash = JSON.stringify(children);
+                if (silent && div.dataset.lastHash === dataHash) {
+                    return;
                 }
+                div.dataset.lastHash = dataHash;
 
-                // Save globally for use in reports/grades dropdown
                 myStudentsData = children;
 
                 if (user) {
@@ -2789,7 +3304,12 @@
                 }
 
                 div.innerHTML = children.map(child => {
-                    const hasCoords = child.latitude && child.longitude;
+                    const hasCoords = child.school_latitude && child.school_longitude;
+                    const unreadCount = child.unread_messages || 0;
+                    const badgeHtml = unreadCount > 0
+                        ? `<div style="position:absolute; top:-8px; right:-8px; background:#ef4444; color:white; width:20px; height:20px; border-radius:50%; font-size:11px; display:flex; align-items:center; justify-content:center; font-weight:bold; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.2); animation: pulse 2s infinite;">${unreadCount}</div>`
+                        : '';
+
                     return `
                         <div class="child-card-prof">
                             <div class="child-card-header">
@@ -2800,8 +3320,9 @@
                                     <div class="child-name-prof">${child.name}</div>
                                     <div class="child-details-prof">${child.class_name || 'Sem turma'} • ${child.school_name || ''}</div>
                                 </div>
-                                <button class="btn-msg-prof" onclick="openChatWithStudent(${child.id}, '${child.name}', '${child.school_id}', '${child.school_name}')" title="Mensagem">
+                                <button class="btn-msg-prof" style="position: relative;" onclick="openChatWithStudent(${child.id}, '${child.name}', '${child.school_id}', '${child.school_name}')" title="Mensagem">
                                     💬
+                                    ${badgeHtml}
                                 </button>
                             </div>
                             
@@ -2815,7 +3336,7 @@
                                             class="btn-pickup" 
                                             onclick="requestPickup(${child.id}, ${child.school_id})"
                                             disabled>
-                                        <span class="btn-icon">🚗</span> Notificar Chegada
+                                        <span class="btn-icon">✅</span> Estou na Escola - Notificar Chegada!
                                     </button>
                                     
                                     <button id="remote-btn-${child.id}" 
@@ -2829,9 +3350,25 @@
                     `;
                 }).join('');
 
+                // Atualizar Badge Inferior (Total de mensagens não lidas de todos os filhos)
+                const totalUnread = children.reduce((sum, child) => sum + (child.unread_messages || 0), 0);
+                const bottomBadge = document.getElementById('bottom-nav-badge');
+                if (bottomBadge) {
+                    if (totalUnread > 0) {
+                        bottomBadge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+                        bottomBadge.style.display = 'flex';
+                        // Re-trigger animação
+                        bottomBadge.style.animation = 'none';
+                        bottomBadge.offsetHeight;
+                        bottomBadge.style.animation = 'badge-attention 1.5s ease forwards, pulse-soft 2s infinite 1.5s';
+                    } else {
+                        bottomBadge.style.display = 'none';
+                    }
+                }
+
                 // Iniciar monitoramento de distância se houver coordenadas
                 children.forEach(child => {
-                    if (child.latitude && child.longitude) {
+                    if (child.school_latitude && child.school_longitude) {
                         startDistanceTracking(child);
                     }
                 });
@@ -2850,16 +3387,21 @@
                 if (!navigator.geolocation) return;
 
                 navigator.geolocation.getCurrentPosition(position => {
+                    console.log(`[GEO] Aluno ${child.id}: Escola em [${child.school_latitude}, ${child.school_longitude}], Você em [${position.coords.latitude}, ${position.coords.longitude}]`);
+
                     const dist = calculateDistance(
                         position.coords.latitude,
                         position.coords.longitude,
-                        child.latitude,
-                        child.longitude
+                        child.school_latitude,
+                        child.school_longitude
                     );
 
                     const infoDiv = document.getElementById(`dist-info-${child.id}`);
                     const btn = document.getElementById(`pickup-btn-${child.id}`);
                     const remoteBtn = document.getElementById(`remote-btn-${child.id}`);
+
+                    // Debug técnico opcional (invisível mas útil no log)
+                    if (infoDiv) infoDiv.setAttribute('data-geo', `${child.school_latitude},${child.school_longitude}`);
 
                     // Calcular distância em metros
                     const distMeters = dist * 1000;
@@ -2942,7 +3484,7 @@
 
             try {
                 btn.disabled = true;
-                btn.innerHTML = 'Enviando...';
+                btn.innerHTML = '⏳ Enviando...';
 
                 const token = localStorage.getItem('token');
                 const res = await fetch(`${API_URL}/guardian/pickup`, {
@@ -2956,19 +3498,21 @@
 
                 const data = await res.json();
                 if (data.success) {
-                    btn.style.background = '#059669';
-                    btn.innerHTML = '✅ Notificado!';
-                    setTimeout(() => {
-                        btn.disabled = false;
-                        btn.innerHTML = originalText;
-                    }, 5000);
+                    // Mudar para estado de "aguardando chamada"
+                    btn.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)';
+                    btn.style.boxShadow = '0 4px 20px rgba(99, 102, 241, 0.4)';
+                    btn.innerHTML = '✅ Portaria Notificada - Aguardando Chamada';
+                    btn.classList.add('waiting-call-animation');
+
+                    // Guardar estado para não perder ao recarregar
+                    localStorage.setItem(`pickup_waiting_${studentId}`, 'true');
                 } else {
                     alert(data.message || 'Erro ao notificar');
                     btn.disabled = false;
                     btn.innerHTML = originalText;
                 }
             } catch (error) {
-                alert('Erro na conexão');
+                alert('Erro ao notificar');
                 btn.disabled = false;
                 btn.innerHTML = originalText;
             }
@@ -3041,104 +3585,7 @@
         }
 
         // --- RELATÓRIOS ---
-        function loadReportScreen() {
-            const select = document.getElementById('reportStudentSelect');
-            if (myStudentsData.length === 0) {
-                select.innerHTML = '<option>Sem alunos vinculados</option>';
-                return;
-            }
 
-            select.innerHTML = myStudentsData.map(student =>
-                `<option value="${student.id}">${student.name}</option>`
-            ).join('');
-
-            loadStudentReport();
-        }
-
-        function changeReportMonth(delta) {
-            currentReportDate.setMonth(currentReportDate.getMonth() + delta);
-            loadStudentReport();
-        }
-
-        async function loadStudentReport() {
-            const studentId = document.getElementById('reportStudentSelect').value;
-            if (!studentId) return;
-
-            const student = myStudentsData.find(s => s.id == studentId);
-            if (!student) return;
-
-            // Atualizar Label
-            document.getElementById('reportMonthLabel').textContent = currentReportDate.toLocaleDateString('pt-BR', { month: 'long' });
-            document.getElementById('reportYearLabel').textContent = currentReportDate.getFullYear();
-
-            // Buscar dados
-            const month = currentReportDate.getMonth() + 1;
-            const year = currentReportDate.getFullYear();
-
-            try {
-                const token = localStorage.getItem('token');
-                // Usar student.schoolId que veio do endpoint my-students (tratar snake_case do backend)
-                const schoolId = student.school_id || student.schoolId;
-                const res = await fetch(`${API_URL}/guardian/student-attendance?schoolId=${schoolId}&studentId=${studentId}&month=${month}&year=${year}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                const attendanceData = await res.json();
-                renderCalendar(attendanceData || []);
-            } catch (e) {
-                console.error("Erro ao report:", e);
-            }
-        }
-
-        function renderCalendar(attendanceData) {
-            const container = document.getElementById('calendarDays');
-            container.innerHTML = '';
-
-            const year = currentReportDate.getFullYear();
-            const month = currentReportDate.getMonth();
-
-            const firstDay = new Date(year, month, 1);
-            const lastDay = new Date(year, month + 1, 0);
-
-            // Empty slots for start
-            for (let i = 0; i < firstDay.getDay(); i++) {
-                const div = document.createElement('div');
-                div.className = 'calendar-day day-empty';
-                container.appendChild(div);
-            }
-
-            // Days
-            const today = new Date();
-            for (let day = 1; day <= lastDay.getDate(); day++) {
-                const date = new Date(year, month, day);
-                const dateStr = date.toISOString().split('T')[0];
-
-                // Verificar presença (Entry/Arrival)
-                // attendanceData tem timestamp ISO. Converter para YYYY-MM-DD local se possível ou bater dates
-                const hasRecord = attendanceData.some(r => {
-                    const rDate = new Date(r.timestamp);
-                    return rDate.getDate() === day && rDate.getMonth() === month;
-                });
-
-                const div = document.createElement('div');
-                div.className = 'calendar-day';
-                div.textContent = day;
-
-                // Estilo
-                if (date.toDateString() === today.toDateString()) {
-                    div.classList.add('day-today');
-                }
-
-                if (hasRecord) {
-                    div.classList.add('day-present');
-                    div.title = 'Presente';
-                } else if (date < today && date.getDay() !== 0 && date.getDay() !== 6) {
-                    div.classList.add('day-absent');
-                    // Fim de semana check simples
-                }
-                container.appendChild(div);
-            }
-        }
 
         // --- EVENTOS E NOTIFICAÇÕES DA ESCOLA ---
         // --- EVENTOS E NOTIFICAÇÕES DA ESCOLA (REESCRITO PARA ROBUSTEZ V2) ---
@@ -3241,6 +3688,7 @@
                                 <div style="display:flex; align-items:center; gap:5px;">📅 ${dateDisplay}</div>
                                 <div style="display:flex; align-items:center; gap:5px;">🏫 ${event.school_name || 'Escola'}</div>
                                 <div style="display:flex; align-items:center; gap:5px;">📚 ${event.class_name || 'Geral'}</div>
+                                <div style="display:flex; align-items:center; gap:5px; color: #6366f1; font-weight: 700;">👥 ${event.confirmation_count || 0} confirmados</div>
                             </div>
 
                             ${event.pix_key ? `
@@ -3250,18 +3698,18 @@
                                     ${event.payment_deadline ? `<p style="font-size:11px; color:#ef4444; margin:8px 0 0 0; font-weight:600;">⚠️ Pagar até: ${new Date(event.payment_deadline + 'T12:00:00').toLocaleDateString('pt-BR')}</p>` : ''}
                                 </div>
                                 <div style="display:flex; gap:10px; margin-top:12px;">
-                                    <button onclick="confirmEventParticipation(${event.id}, ${event.school_id})" 
+                                    <button onclick="confirmEventParticipation(${event.id}, ${event.schoolId || event.school_id})" 
                                             style="flex:1; background:#6366f1; color:white; border:none; padding:12px; border-radius:12px; font-weight:700; font-size:13px; cursor:pointer;">
                                         ✅ Confirmar
                                     </button>
-                                    <input type="file" id="receipt-${event.id}" accept="image/*,application/pdf" style="display:none" onchange="uploadReceipt(this, ${event.id}, ${event.school_id})">
+                                    <input type="file" id="receipt-${event.id}" accept="image/*,application/pdf" style="display:none" onchange="uploadReceipt(this, ${event.id}, ${event.schoolId || event.school_id})">
                                     <button onclick="document.getElementById('receipt-${event.id}').click()" 
                                             style="flex:1; background:#10b981; color:white; border:none; padding:12px; border-radius:12px; font-weight:700; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
                                         📤 Comprovante
                                     </button>
                                 </div>
                             ` : `
-                                <button onclick="confirmEventParticipation(${event.id}, ${event.school_id})" 
+                                <button onclick="confirmEventParticipation(${event.id}, ${event.schoolId || event.school_id})" 
                                         style="width:100%; margin-top:20px; background:#6366f1; color:white; border:none; padding:14px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 6px -1px rgba(99, 102, 241, 0.2);">
                                     ✅ Estar Ciente / Participar
                                 </button>
@@ -3760,7 +4208,19 @@
             }
         }, { once: true });
 
-        // Ensure SSE starts if not started
+        // Polling para mensagens não lidas
+        let unreadPoller = null;
+        function startUnreadPoller() {
+            if (unreadPoller) clearInterval(unreadPoller);
+            unreadPoller = setInterval(() => {
+                if (localStorage.getItem('token')) {
+                    loadChildren(true); // silent
+                }
+            }, 10000); // 10 segundos
+        }
+
+        // Iniciar Pollers
+        startUnreadPoller();
         setTimeout(startEventsSSE, 1000);
 
 

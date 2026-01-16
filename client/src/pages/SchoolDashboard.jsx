@@ -493,21 +493,15 @@ export default function SchoolDashboard() {
                 // Criar novo aluno
                 // Criar novo aluno
                 const response = await api.post('/school/students', studentForm);
-                const { guardian_login, guardian_password, guardian_info } = response.data;
+                const { guardian_login, guardian_password } = response.data;
 
                 console.log('✅ Aluno cadastrado. Resposta:', response.data);
 
                 let message = '✅ Aluno cadastrado com sucesso!';
-
-                if (guardian_info) {
-                    message += `\n\nℹ️ ${guardian_info}`;
+                if (guardian_login && guardian_password) {
+                    message += `\n\n📧 Conta do Responsável Criada:\nLogin: ${guardian_login}\nSenha: ${guardian_password}\n\n(Anote ou tire foto!)`;
                 } else if (guardian_login) {
-                    message += `\n\n📧 Email do responsável registrado: ${guardian_login}`;
-                }
-
-                // Mantendo fallback caso o backend venha a enviar senha no futuro (improvável, mas seguro)
-                if (guardian_password) {
-                    message += `\n\n🔐 Senha gerada: ${guardian_password}`;
+                    message += `\n\n📧 Aluno vinculado ao responsável: ${guardian_login}`;
                 }
 
                 alert(message);
@@ -879,6 +873,7 @@ export default function SchoolDashboard() {
                                         onChange={(e) => setStudentForm({ ...studentForm, parent_email: e.target.value })}
                                         required
                                     />
+
                                     <input
                                         className="input-field"
                                         placeholder="Telefone do Responsável"

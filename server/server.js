@@ -18,13 +18,7 @@ const PORT = process.env.PORT || 5000;
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const SECRET_KEY = process.env.SECRET_KEY || 'edufocus_secret_key_change_me';
 
-// Middleware para logar todas as requisições - DEBUG
-app.use((req, res, next) => {
-    if (req.method === 'PUT' || req.method === 'DELETE') {
-        console.log(`[DEBUG] ${req.method} ${req.originalUrl}`);
-    }
-    next();
-});
+
 
 // --- AUTO-RECONNECT WHATSAPP ON BOOT ---
 async function reconnectWhatsAppSessions() {
@@ -67,6 +61,21 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Middleware para logar todas as requisições - DEBUG (MOVED)
+app.use((req, res, next) => {
+    if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
+        console.log(`[DEBUG] ${req.method} ${req.originalUrl}`);
+        // Log body safely
+        if (req.method === 'POST') {
+            try {
+                const bodyStr = JSON.stringify(req.body, null, 2);
+                console.log('Body:', bodyStr ? bodyStr.substring(0, 200) : 'undefined');
+            } catch (e) { console.log('Body log error:', e.message); }
+        }
+    }
+    next();
+});
 
 // --- AUTOMATIC CLEANUP ---
 // Limpar registros de presença com mais de 7 dias
@@ -250,6 +259,12 @@ try {
         systemDB.prepare("ALTER TABLE schools ADD COLUMN number TEXT").run();
         systemDB.prepare("ALTER TABLE schools ADD COLUMN zip_code TEXT").run();
     }
+
+    const hasCustomPrice = tableInfo.some(col => col.name === 'custom_price');
+    if (!hasCustomPrice) {
+        console.log('Migrating system DB: Adding custom_price column to schools');
+        systemDB.prepare("ALTER TABLE schools ADD COLUMN custom_price REAL DEFAULT NULL").run();
+    }
 } catch (e) {
     console.error('Error migrating schools table:', e);
 }
@@ -271,6 +286,28 @@ const authenticateToken = (req, res, next) => {
         next();
     });
 };
+
+// Middleware to verify guardian token
+const authenticateGuardian = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    jwt.verify(token, SECRET_KEY, (err, user) => {
+        if (err) {
+            return res.status(403).json({ message: 'Invalid or expired token' });
+        }
+
+        // Verificar se é um guardian (role pode ser 'guardian' ou verificar na tabela guardians)
+        // Por enquanto, aceitar qualquer token válido para guardians
+        req.user = user;
+        next();
+    });
+};
+
 
 // --- AUTH ROUTES ---
 
@@ -307,6 +344,12 @@ app.post('/api/login', async (req, res) => {
     }
 
     if (!user) {
+        // Check Inspectors
+        user = db.prepare('SELECT * FROM inspectors WHERE email = ?').get(email);
+        role = 'inspector';
+    }
+
+    if (!user) {
         return res.status(400).json({ message: 'User not found' });
     }
 
@@ -333,12 +376,12 @@ app.post('/api/register/teacher', async (req, res) => {
 });
 
 app.post('/api/register/school', async (req, res) => {
-    const { name, admin_name, email, password, address } = req.body;
+    const { name, admin_name, email, password, address, number, zip_code } = req.body;
     const db = getSystemDB();
 
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        const info = db.prepare('INSERT INTO schools (name, admin_name, email, password, address) VALUES (?, ?, ?, ?, ?)').run(name, admin_name, email, hashedPassword, address);
+        const info = db.prepare('INSERT INTO schools (name, admin_name, email, password, address, number, zip_code) VALUES (?, ?, ?, ?, ?, ?, ?)').run(name, admin_name, email, hashedPassword, address, number, zip_code);
         // Initialize School DB
         getSchoolDB(info.lastInsertRowid);
         res.json({ message: 'School registered successfully.' });
@@ -699,23 +742,178 @@ app.get('/api/school/settings', authenticateToken, (req, res) => {
 });
 
 app.post('/api/school/settings', authenticateToken, (req, res) => {
-    if (req.user.role !== 'school_admin') return res.sendStatus(403);
+    console.log('📍 [SETTINGS] POST recebido');
+    console.log('📍 [SETTINGS] User:', req.user);
+    console.log('📍 [SETTINGS] Body:', req.body);
+
     const { address, number, zip_code, latitude, longitude } = req.body;
     const db = getSystemDB();
     const id = req.user.school_id || req.user.id;
 
+    console.log(`📍 [SETTINGS] Tentando salvar para escola ID: ${id}`);
+
     try {
-        db.prepare(`
+        const school = db.prepare('SELECT id, name FROM schools WHERE id = ?').get(id);
+        if (!school) {
+            console.error(`❌ [SETTINGS] Escola ID ${id} não encontrada`);
+            return res.status(404).json({ error: 'Escola não encontrada' });
+        }
+
+        console.log(`📍 [SETTINGS] Escola encontrada: ${school.name}`);
+
+        const result = db.prepare(`
             UPDATE schools 
             SET address = ?, number = ?, zip_code = ?, latitude = ?, longitude = ? 
             WHERE id = ?
         `).run(address, number, zip_code, latitude, longitude, id);
 
-        console.log(`✅ Settings atualizados para escola ID ${id}: GPS ${latitude}, ${longitude}`);
-        res.json({ success: true });
+        console.log(`✅ [SETTINGS] UPDATE executado. Changes: ${result.changes}`);
+
+        if (result.changes === 0) {
+            console.warn(`⚠️ [SETTINGS] Nenhuma linha foi atualizada!`);
+        }
+
+        const updated = db.prepare('SELECT address, number, zip_code, latitude, longitude FROM schools WHERE id = ?').get(id);
+        console.log(`✅ [SETTINGS] Dados salvos:`, updated);
+
+        res.json({ success: true, data: updated });
     } catch (error) {
-        console.error('Erro ao salvar settings:', error);
-        res.status(500).json({ error: 'Erro ao salvar configurações' });
+        console.error('❌ [SETTINGS] Erro ao salvar:', error);
+        res.status(500).json({ error: 'Erro ao salvar configurações', details: error.message });
+    }
+});
+
+// --- SAAS BILLING ROUTES ---
+
+// Helper para pegar preço padrão
+function getDefaultSaasPrice() {
+    const db = getSystemDB();
+    const setting = db.prepare("SELECT value FROM system_settings WHERE key = 'saas_default_price'").get();
+    return setting ? parseFloat(setting.value) : 6.50;
+}
+
+// Endpoint para a escola visualizar sua própria fatura
+app.get('/api/saas/school/billing', authenticateToken, (req, res) => {
+    // Permite school_admin ou super_admin
+    if (req.user.role !== 'school_admin' && req.user.role !== 'super_admin') return res.sendStatus(403);
+
+    const schoolId = req.query.school_id || req.user.school_id || req.user.id;
+    const systemDB = getSystemDB();
+
+    try {
+        // 1. Informações da Escola e Preço
+        const school = systemDB.prepare("SELECT id, name, custom_price FROM schools WHERE id = ?").get(schoolId);
+        if (!school) return res.status(404).json({ error: 'Escola não encontrada' });
+
+        const defaultPrice = getDefaultSaasPrice();
+        const pricePerStudent = (school.custom_price !== null && school.custom_price !== undefined)
+            ? school.custom_price
+            : defaultPrice;
+
+        // 2. Contar Alunos no banco da escola
+        let studentCount = 0;
+        try {
+            const schoolDB = getSchoolDB(schoolId);
+            const result = schoolDB.prepare("SELECT COUNT(*) as count FROM students").get();
+            studentCount = result ? result.count : 0;
+        } catch (dbErr) {
+            console.warn(`[BILLING] Erro ao acessar banco da escola ${schoolId}: ${dbErr.message}`);
+            studentCount = 0;
+        }
+
+        // 3. Cálculos
+        const totalAmount = studentCount * pricePerStudent;
+        const today = new Date();
+        const dueDate = new Date(today.getFullYear(), today.getMonth(), 5);
+
+        const status = today.getDate() > 5 ? 'OVERDUE' : 'PENDING';
+
+        res.json({
+            school_name: school.name,
+            student_count: studentCount,
+            price_per_student: pricePerStudent,
+            total_amount: totalAmount,
+            currency: "BRL",
+            due_date: dueDate.toISOString().split('T')[0],
+            status: status,
+            is_custom_price: school.custom_price !== null
+        });
+
+    } catch (e) {
+        console.error('[BILLING] Erro:', e);
+        res.status(500).json({ error: 'Erro ao calcular fatura', details: e.message });
+    }
+});
+
+// Endpoint para Super Admin listar faturamento de todas as escolas
+app.get('/api/saas/admin/schools', authenticateToken, (req, res) => {
+    if (req.user.role !== 'super_admin') return res.sendStatus(403);
+
+    const systemDB = getSystemDB();
+    const defaultPrice = getDefaultSaasPrice();
+
+    try {
+        const schools = systemDB.prepare("SELECT id, name, custom_price FROM schools").all();
+        const results = schools.map(s => {
+            let studentCount = 0;
+            try {
+                const sDB = getSchoolDB(s.id);
+                const countRes = sDB.prepare("SELECT COUNT(*) as count FROM students").get();
+                studentCount = countRes ? countRes.count : 0;
+            } catch (e) { }
+
+            const price = s.custom_price !== null ? s.custom_price : defaultPrice;
+
+            return {
+                id: s.id,
+                name: s.name,
+                student_count: studentCount,
+                price_per_student: price,
+                is_custom_price: s.custom_price !== null,
+                current_invoice_total: studentCount * price
+            };
+        });
+
+        res.json(results);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Endpoint para Super Admin buscar preço global
+app.get('/api/saas/admin/config', authenticateToken, (req, res) => {
+    if (req.user.role !== 'super_admin') return res.sendStatus(403);
+    res.json({ default_price: getDefaultSaasPrice() });
+});
+
+// Endpoint para Super Admin atualizar preço global
+app.post('/api/saas/admin/config', authenticateToken, (req, res) => {
+    if (req.user.role !== 'super_admin') return res.sendStatus(403);
+    const { default_price } = req.body;
+
+    if (default_price === undefined) return res.status(400).json({ error: 'Preço necessário' });
+
+    try {
+        const db = getSystemDB();
+        db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('saas_default_price', ?)").run(String(default_price));
+        res.json({ success: true, new_default_price: default_price });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Endpoint para Super Admin atualizar preço customizado de uma escola
+app.put('/api/saas/admin/school/:school_id/price', authenticateToken, (req, res) => {
+    if (req.user.role !== 'super_admin') return res.sendStatus(403);
+    const { school_id } = req.params;
+    const { custom_price } = req.body; // Pode ser null para resetar
+
+    try {
+        const db = getSystemDB();
+        db.prepare("UPDATE schools SET custom_price = ? WHERE id = ?").run(custom_price, school_id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -1309,12 +1507,158 @@ app.get('/api/school/students/faces', authenticateToken, (req, res) => {
 });
 
 
+// --- INSPECTOR ROUTES ---
+
+// List Inspectors for the School
+app.get('/api/school/inspectors', authenticateToken, (req, res) => {
+    if (req.user.role !== 'school_admin') return res.sendStatus(403);
+    const db = getSystemDB();
+    try {
+        // Inspectors are in systemDB with school_id
+        const inspectors = db.prepare('SELECT id, name, email FROM inspectors WHERE school_id = ?').all(req.user.id);
+        res.json(inspectors);
+    } catch (e) {
+        console.error('Erro ao listar inspetores:', e);
+        res.json([]);
+    }
+});
+
+// Create Inspector
+app.post('/api/school/inspectors', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'school_admin') return res.sendStatus(403);
+    const { name, email, password } = req.body;
+    const db = getSystemDB();
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        db.prepare('INSERT INTO inspectors (name, email, password, school_id) VALUES (?, ?, ?, ?)').run(name, email, hashedPassword, req.user.id);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Erro ao criar inspetor:', e);
+        if (e.message.includes('UNIQUE constraint failed') || e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            return res.status(400).json({ error: 'Email já cadastrado.' });
+        }
+        res.status(500).json({ error: 'Erro ao criar inspetor.' });
+    }
+});
+
+// Delete Inspector
+app.delete('/api/school/inspectors/:id', authenticateToken, (req, res) => {
+    if (req.user.role !== 'school_admin') return res.sendStatus(403);
+    const { id } = req.params;
+    const db = getSystemDB();
+    try {
+        db.prepare('DELETE FROM inspectors WHERE id = ? AND school_id = ?').run(id, req.user.id);
+        res.json({ success: true });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Erro ao excluir.' });
+    }
+});
+
+
+// --- PICKUP ROUTES (For Inspectors) ---
+
+app.get('/api/school/pickups', authenticateToken, (req, res) => {
+    // School Admin, Inspector, Teacher
+    if (!['school_admin', 'inspector', 'teacher'].includes(req.user.role)) return res.sendStatus(403);
+
+    // Admin ID = School ID. Others have school_id property.
+    const schoolId = req.user.school_id || req.user.id;
+    const db = getSchoolDB(schoolId);
+    const systemDB = getSystemDB();
+
+    try {
+        // Table pickups might not exist if created recently? No, it's in db.js
+        const pickups = db.prepare(`
+            SELECT p.*, s.name as student_name, s.class_name, s.photo_url
+            FROM pickups p
+            JOIN students s ON p.student_id = s.id
+            WHERE date(p.timestamp) = date('now', 'localtime')
+            ORDER BY p.timestamp DESC
+        `).all();
+
+        // Enriquecer com nome do guardian
+        const enriched = pickups.map(p => {
+            const g = systemDB.prepare('SELECT name FROM guardians WHERE id = ?').get(p.guardian_id);
+            return { ...p, guardian_name: g ? g.name : 'Responsável' };
+        });
+
+        res.json(enriched);
+    } catch (e) {
+        console.error('Erro get pickups:', e);
+        res.json([]);
+    }
+});
+
+app.post('/api/school/pickups/:id/status', authenticateToken, (req, res) => {
+    if (!['school_admin', 'inspector', 'teacher'].includes(req.user.role)) return res.sendStatus(403);
+    const schoolId = req.user.school_id || req.user.id;
+    const { status } = req.body;
+    const db = getSchoolDB(schoolId);
+    const systemDB = getSystemDB();
+
+    try {
+        // Update the pickup status
+        db.prepare('UPDATE pickups SET status = ? WHERE id = ?').run(status, req.params.id);
+
+        // If status is 'calling', notify the guardian
+        if (status === 'calling') {
+            // Get pickup details to find guardian and student
+            const pickup = db.prepare(`
+                SELECT p.*, s.name as student_name 
+                FROM pickups p 
+                JOIN students s ON p.student_id = s.id 
+                WHERE p.id = ?
+            `).get(req.params.id);
+
+            if (pickup) {
+                console.log(`📢 [Pickup] Notificando Guardian ${pickup.guardian_id} - Aluno ${pickup.student_name} está sendo chamado!`);
+
+                // Create notification table if not exists
+                db.exec(`
+                    CREATE TABLE IF NOT EXISTS pickup_notifications (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        pickup_id INTEGER NOT NULL,
+                        guardian_id INTEGER NOT NULL,
+                        student_name TEXT,
+                        notification_type TEXT DEFAULT 'calling',
+                        read_at DATETIME,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                `);
+
+                // Insert notification
+                db.prepare(`
+                    INSERT INTO pickup_notifications (pickup_id, guardian_id, student_name, notification_type)
+                    VALUES (?, ?, ?, 'calling')
+                `).run(pickup.id, pickup.guardian_id, pickup.student_name);
+
+                console.log(`✅ [Pickup] Notificação criada para Guardian ${pickup.guardian_id}`);
+            }
+        }
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Erro ao atualizar status' });
+    }
+});
+
+
+
 // --- TEACHER ROUTES ---
 
 app.get('/api/teacher/me', authenticateToken, (req, res) => {
     if (req.user.role !== 'teacher') return res.sendStatus(403);
     const db = getSystemDB();
     const teacher = db.prepare('SELECT id, name, email, subject, school_id, status FROM teachers WHERE id = ?').get(req.user.id);
+
+    if (teacher && teacher.school_id) {
+        const school = db.prepare('SELECT name FROM schools WHERE id = ?').get(teacher.school_id);
+        teacher.school_name = school ? school.name : 'Escola Desconhecida';
+    }
+
     res.json(teacher);
 });
 
@@ -1957,22 +2301,57 @@ app.get('/api/school/students', authenticateToken, (req, res) => {
         const students = schoolDB.prepare('SELECT * FROM students ORDER BY name').all();
 
         // Parse face_descriptor
-        const studentsWithParsedDescriptors = students.map(s => {
+        const studentsSanitized = students.map(s => {
             let descriptor = s.face_descriptor;
             if (descriptor && typeof descriptor === 'string') {
-                try {
-                    descriptor = JSON.parse(descriptor);
-                } catch (e) {
-                    descriptor = null;
-                }
+                try { descriptor = JSON.parse(descriptor); } catch (e) { descriptor = null; }
             }
-            return { ...s, face_descriptor: descriptor };
+            return {
+                ...s,
+                face_descriptor: descriptor
+            };
         });
 
-        res.json(studentsWithParsedDescriptors);
+        res.json(studentsSanitized);
     } catch (error) {
-        console.error('Error fetching students:', error);
-        res.status(500).json({ error: 'Error fetching students' });
+        console.error('Erro ao buscar estudantes:', error);
+        res.status(500).json({ error: 'Erro ao buscar estudantes' });
+    }
+});
+
+// Mensagens do professor (Comunicado Escola <-> Professor)
+app.get('/api/teacher/messages', authenticateToken, (req, res) => {
+    try {
+        if (req.user.role !== 'teacher') return res.sendStatus(403);
+        const db = getSystemDB();
+
+        // Buscar mensagens onde o professor é destinatário ou remetente
+        const messages = db.prepare(`
+            SELECT * FROM messages 
+            WHERE (to_user_id = ? AND to_user_type = 'teacher')
+               OR (from_user_id = ? AND from_user_type = 'teacher')
+            ORDER BY created_at DESC
+        `).all(req.user.id, req.user.id);
+
+        res.json(messages);
+    } catch (error) {
+        console.error('Erro ao buscar mensagens:', error);
+        res.status(500).json({ error: 'Erro ao buscar mensagens' });
+    }
+});
+
+app.put('/api/teacher/messages/:id/read', authenticateToken, (req, res) => {
+    try {
+        if (req.user.role !== 'teacher') return res.sendStatus(403);
+        const { id } = req.params;
+        const db = getSystemDB();
+
+        db.prepare('UPDATE messages SET read_status = 1 WHERE id = ? AND to_user_id = ? AND to_user_type = "teacher"')
+            .run(id, req.user.id);
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Erro ao marcar mensagem como lida' });
     }
 });
 
@@ -2020,43 +2399,9 @@ app.put('/api/school/students/:id', authenticateToken, (req, res) => {
     }
 });
 
-app.get('/api/teacher/me', authenticateToken, (req, res) => {
-    if (req.user.role !== 'teacher') return res.sendStatus(403);
-    const db = getSystemDB();
-    const teacher = db.prepare('SELECT * FROM teachers WHERE id = ?').get(req.user.id);
+// Rota duplicada removida (consolidada em 1650)
 
-    if (teacher && teacher.school_id) {
-        const school = db.prepare('SELECT name FROM schools WHERE id = ?').get(teacher.school_id);
-        teacher.school_name = school ? school.name : 'Escola Desconhecida';
-    }
-
-    res.json(teacher);
-});
-
-app.get('/api/teacher/classes', authenticateToken, (req, res) => {
-    if (req.user.role !== 'teacher') return res.sendStatus(403);
-
-    const db = getSystemDB();
-    const teacher = db.prepare('SELECT school_id FROM teachers WHERE id = ?').get(req.user.id);
-
-    if (!teacher || !teacher.school_id) {
-        return res.json([]);
-    }
-
-    const schoolDB = getSchoolDB(teacher.school_id);
-    try {
-        const classes = schoolDB.prepare(`
-            SELECT c.*
-    FROM classes c
-            JOIN teacher_classes tc ON c.id = tc.class_id
-            WHERE tc.teacher_id = ?
-    `).all(req.user.id);
-        res.json(classes);
-    } catch (error) {
-        console.error('Error fetching teacher classes:', error);
-        res.json([]);
-    }
-});
+// Rota duplicada removida (consolidada em 1650)
 
 // --- WHATSAPP INTEGRATION (MULTI-TENANT) ---
 
@@ -3077,13 +3422,13 @@ app.get('/api/support/tickets/all', authenticateToken, async (req, res) => {
 app.post('/api/teacher/polls', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'teacher') return res.sendStatus(403);
-        const { class_id, question, optionA, optionB, optionC, optionD, correct_answer } = req.body;
+        const { class_id, question, option1, option2, option3, option4, correct_answer } = req.body;
         const schoolDB = getSchoolDB(req.user.school_id);
 
         const result = schoolDB.prepare(`
             INSERT INTO polls (teacher_id, class_id, question, option_a, option_b, option_c, option_d, correct_answer, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-        `).run(req.user.id, class_id, question, optionA, optionB, optionC, optionD, correct_answer);
+        `).run(req.user.id, class_id, question, option1 || '', option2 || '', option3 || '', option4 || '', correct_answer);
 
         res.json({ success: true, pollId: result.lastInsertRowid });
     } catch (error) {
@@ -3357,7 +3702,7 @@ app.get('/api/teacher/class/:classId/last-seating-change', authenticateToken, as
 
         const lastChange = schoolDB.prepare(`
             SELECT MAX(created_at) as last_change
-            FROM seating_arrangements_new
+            FROM seating_arrangements
             WHERE class_id = ?
         `).get(classId);
 
@@ -4650,17 +4995,23 @@ app.post('/api/guardian/register', async (req, res) => {
 // Login de Guardian
 app.post('/api/guardian/login', async (req, res) => {
     const { email, password } = req.body;
+    console.log(`🔐 [LOGIN ATTEMPT] Email: ${email}`);
+
     const db = getSystemDB();
 
     try {
         const guardian = db.prepare('SELECT * FROM guardians WHERE email = ?').get(email);
 
         if (!guardian) {
+            console.log(`❌ [LOGIN FAILED] Guardian não encontrado: ${email}`);
             return res.status(401).json({ error: 'Email ou senha incorretos' });
         }
 
+        console.log(`✅ [LOGIN] Guardian encontrado: ${guardian.name}, Hash: ${guardian.password.substring(0, 10)}...`);
+
         const validPassword = await bcrypt.compare(password, guardian.password);
         if (!validPassword) {
+            console.log(`❌ [LOGIN FAILED] Senha incorreta para: ${email}`);
             return res.status(401).json({ error: 'Email ou senha incorretos' });
         }
 
@@ -4688,34 +5039,6 @@ app.post('/api/guardian/login', async (req, res) => {
         res.status(500).json({ error: 'Erro no login' });
     }
 });
-
-// Middleware de autenticação para guardians
-function authenticateGuardian(req, res, next) {
-    const authHeader = req.headers.authorization;
-    console.log('🔐 [Guardian Auth] Header:', authHeader ? 'Presente' : 'Ausente');
-
-    if (!authHeader) {
-        console.log('❌ [Guardian Auth] Sem header de autorização');
-        return res.status(401).json({ error: 'Token não fornecido' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    console.log('🔑 [Guardian Auth] Token:', token ? token.substring(0, 20) + '...' : 'Vazio');
-
-    jwt.verify(token, SECRET_KEY, (err, user) => {
-        if (err) {
-            console.log('❌ [Guardian Auth] Token inválido:', err.message);
-            return res.status(403).json({ error: 'Token inválido ou expirado' });
-        }
-        if (user.role !== 'guardian') {
-            console.log('❌ [Guardian Auth] Role incorreta:', user.role);
-            return res.status(403).json({ error: 'Acesso negado' });
-        }
-        console.log('✅ [Guardian Auth] Autenticado:', user.email);
-        req.user = user;
-        next();
-    });
-}
 
 // Listar todas as escolas (para dropdown no app)
 app.get('/api/guardian/schools', (req, res) => {
@@ -4846,61 +5169,8 @@ app.post('/api/guardian/link-student', authenticateGuardian, async (req, res) =>
     }
 });
 
-// Listar alunos vinculados do guardian
-app.get('/api/guardian/my-students', authenticateGuardian, (req, res) => {
-    const guardianId = req.user.id;
-    console.log(`🔍 [My Students] Buscando alunos para Guardian ID: ${guardianId}`);
+// Rota movida para o final (linha 6050+) para incluir unread_messages e logs extras.
 
-    const db = getSystemDB();
-
-    try {
-        // Buscar todas as escolas
-        // Buscar todas as escolas (incluindo GPS)
-        const schools = db.prepare('SELECT id, name, latitude, longitude FROM schools').all();
-        console.log(`🔍 [My Students] Total de escolas no sistema: ${schools.length}`);
-
-        const allStudents = [];
-
-        schools.forEach(school => {
-            try {
-                const schoolDB = getSchoolDB(school.id);
-                // Verificar se a tabela existe antes de consultar
-                const tableExists = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='student_guardians'").get();
-
-                if (tableExists) {
-                    const students = schoolDB.prepare(`
-                        SELECT 
-                            s.id,
-                            s.name,
-                            s.class_name,
-                            s.photo_url,
-                            sg.relationship,
-                            ? as school_name,
-                            ? as school_id,
-                            ? as latitude,
-                            ? as longitude
-                        FROM students s
-                        JOIN student_guardians sg ON s.id = sg.student_id
-                        WHERE sg.guardian_id = ?
-                    `).all(school.name, school.id, school.latitude, school.longitude, guardianId);
-
-                    if (students.length > 0) {
-                        console.log(`✅ [My Students] Encontrados ${students.length} alunos na Escola ${school.id}`);
-                        allStudents.push(...students);
-                    }
-                }
-            } catch (err) {
-                console.error(`❌ [My Students] Erro ao verificar escola ${school.id}:`, err.message);
-            }
-        });
-
-        console.log(`✅ [My Students] Total final de alunos retornados: ${allStudents.length}`);
-        res.json(allStudents);
-    } catch (error) {
-        console.error('Erro ao buscar alunos do guardian:', error);
-        res.status(500).json({ error: 'Erro ao buscar alunos' });
-    }
-});
 
 // Solicitação de Pickup (Guardian)
 app.post('/api/guardian/pickup', authenticateGuardian, (req, res) => {
@@ -4929,11 +5199,112 @@ app.post('/api/guardian/pickup', authenticateGuardian, (req, res) => {
         res.json({ success: true, message: 'Solicitação enviada!' });
     } catch (error) {
         console.error('❌ Erro no pickup:', error);
-        res.status(500).json({ error: 'Erro ao processar solicitação.' });
+        res.status(500).json({ error: 'Erro ao processar solicitação.', details: error.message });
     }
 });
 
 // Atualizar FCM token do guardian (para notificações push)
+
+// GET Pickup Notifications for Guardian (when inspector calls the student)
+app.get('/api/guardian/pickup-notifications', authenticateGuardian, (req, res) => {
+    const guardianId = req.user.id;
+    const db = getSystemDB();
+
+    try {
+        // Get all schools
+        const schools = db.prepare('SELECT id FROM schools').all();
+        const notifications = [];
+
+        schools.forEach(school => {
+            try {
+                const schoolDB = getSchoolDB(school.id);
+
+                // Check if table exists
+                const tableExists = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='pickup_notifications'").get();
+
+                if (tableExists) {
+                    // Get unread notifications for this guardian
+                    const notifs = schoolDB.prepare(`
+                        SELECT * FROM pickup_notifications 
+                        WHERE guardian_id = ? AND read_at IS NULL
+                        ORDER BY created_at DESC
+                        LIMIT 5
+                    `).all(guardianId);
+
+                    notifs.forEach(n => {
+                        notifications.push({
+                            ...n,
+                            school_id: school.id
+                        });
+                    });
+                }
+            } catch (e) {
+                // Ignore errors for individual schools
+            }
+        });
+
+        res.json(notifications);
+    } catch (error) {
+        console.error('Erro ao buscar notificações de pickup:', error);
+        res.status(500).json({ error: 'Erro ao buscar notificações' });
+    }
+});
+
+// Mark pickup notification as read
+app.post('/api/guardian/pickup-notifications/:id/read', authenticateGuardian, (req, res) => {
+    const { school_id } = req.body;
+    const notificationId = req.params.id;
+
+    try {
+        const schoolDB = getSchoolDB(school_id);
+        schoolDB.prepare('UPDATE pickup_notifications SET read_at = datetime("now", "localtime") WHERE id = ?').run(notificationId);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao marcar notificação como lida:', error);
+        res.status(500).json({ error: 'Erro' });
+    }
+});
+// Get active pickup status for guardian's students (to show calling animation)
+app.get('/api/guardian/active-pickups', authenticateGuardian, (req, res) => {
+    const guardianId = req.user.id;
+    const db = getSystemDB();
+
+    try {
+        const schools = db.prepare('SELECT id FROM schools').all();
+        const activePickups = [];
+
+        schools.forEach(school => {
+            try {
+                const schoolDB = getSchoolDB(school.id);
+
+                // Get pickups that are in 'calling' status for this guardian
+                const pickups = schoolDB.prepare(`
+                    SELECT p.*, s.name as student_name, s.class_name
+                    FROM pickups p
+                    JOIN students s ON p.student_id = s.id
+                    WHERE p.guardian_id = ? 
+                    AND p.status = 'calling'
+                    AND date(p.timestamp) = date('now', 'localtime')
+                `).all(guardianId);
+
+                pickups.forEach(p => {
+                    activePickups.push({
+                        ...p,
+                        school_id: school.id
+                    });
+                });
+            } catch (e) {
+                // Ignore
+            }
+        });
+
+        res.json(activePickups);
+    } catch (error) {
+        console.error('Erro ao buscar pickups ativos:', error);
+        res.status(500).json({ error: 'Erro' });
+    }
+});
+
 app.post('/api/guardian/update-fcm-token', authenticateGuardian, (req, res) => {
     const { fcmToken } = req.body;
     const guardianId = req.user.id;
@@ -5061,6 +5432,11 @@ app.get('/api/guardian/chat/:studentId/messages', authenticateGuardian, (req, re
             SELECT * FROM messages WHERE student_id = ? ORDER BY created_at ASC
         `).all(studentId);
 
+        // Marcar como lidas
+        try {
+            schoolDB.prepare("UPDATE messages SET read_at = DATETIME('now', 'localtime') WHERE student_id = ? AND sender_type = 'school' AND read_at IS NULL").run(studentId);
+        } catch (e) { }
+
         res.json(messages);
     } catch (e) {
         console.error(e);
@@ -5166,7 +5542,10 @@ app.post('/api/school/chat/broadcast', authenticateToken, chatUpload.single('fil
     if (!['school_admin', 'teacher', 'receptionist'].includes(req.user.role)) return res.sendStatus(403);
 
     const schoolId = req.user.id;
-    const { classId, content, type } = req.body;
+    const { classId, type } = req.body;
+    let { content } = req.body;
+    if (!content && req.body.text) content = req.body.text;
+    if (classId) content = `[Transmissão] ${content || ''}`;
     const schoolDB = getSchoolDB(schoolId);
 
     try {
@@ -5353,37 +5732,27 @@ app.get('/api/school/events/:id/participants', authenticateToken, (req, res) => 
             SELECT * FROM event_participations WHERE event_id = ?
         `).all(req.params.id);
 
-        // Enriquecer com dados dos alunos vinculados ao guardian
+        // Enriquecer com dados do aluno diretamente
         const result = participants.map(p => {
             let displayStudentName = 'Desconhecido';
             let displayClassName = '-';
 
-            if (p.guardian_id) {
-                // 1. Buscar nome do Responsável (Fallback)
-                const guardian = systemDB.prepare('SELECT name FROM guardians WHERE id = ?').get(p.guardian_id);
-                const guardianName = guardian ? guardian.name : 'Responsável';
-
-                // 2. Buscar Alunos vinculados a este responsável nesta escola
-                const students = db.prepare(`
-                    SELECT s.name, s.class_name 
-                    FROM students s
-                    JOIN student_guardians sg ON s.id = sg.student_id
-                    WHERE sg.guardian_id = ? AND sg.status = 'active'
-                `).all(p.guardian_id);
-
-                if (students && students.length > 0) {
-                    displayStudentName = students.map(s => s.name).join(', ');
-                    displayClassName = students.map(s => s.class_name).join(', ');
-                } else {
-                    displayStudentName = `${guardianName} (Resp. sem aluno vinculado)`;
+            try {
+                if (p.student_id) {
+                    const student = db.prepare('SELECT name, class_name FROM students WHERE id = ?').get(p.student_id);
+                    if (student) {
+                        displayStudentName = student.name;
+                        displayClassName = student.class_name;
+                    }
                 }
-            }
+            } catch (err) { }
 
             return {
                 ...p,
                 student_name: displayStudentName,
-                class_name: displayClassName,
-                confirmed_at: p.created_at
+                class_name: displayClassName || '-',
+                receipt_url: p.payment_proof_url,
+                created_at: p.confirmed_at
             };
         });
 
@@ -5495,8 +5864,16 @@ app.get('/api/guardian/school-events', authenticateGuardian, (req, res) => {
                 let myClasses = [];
 
                 try {
-                    const linkCheck = schoolDB.prepare('SELECT 1 FROM student_guardians WHERE guardian_id = ? AND status = "active"').get(guardianId);
+                    let linkCheck = schoolDB.prepare("SELECT 1 FROM student_guardians WHERE guardian_id = ? AND status = 'active'").get(guardianId);
+                    if (!linkCheck) {
+                        // Fallback: try converting ID type (Number <-> String) to match DB
+                        const altId = (typeof guardianId === 'number') ? String(guardianId) : Number(guardianId);
+                        if (altId && !isNaN(altId)) {
+                            linkCheck = schoolDB.prepare("SELECT 1 FROM student_guardians WHERE guardian_id = ? AND status = 'active'").get(altId);
+                        }
+                    }
                     hasLink = !!linkCheck;
+
                     if (hasLink) {
                         myClasses = schoolDB.prepare(`
                             SELECT DISTINCT s.class_name 
@@ -5507,7 +5884,10 @@ app.get('/api/guardian/school-events', authenticateGuardian, (req, res) => {
                     }
                 } catch (e) { }
 
-                // Sempre busca eventos (globais ou da turma) se a tabela existir
+                // FIX: Security Check - Only fetch events if guardian DOES have students in this school
+                if (!hasLink) continue;
+
+                // Busca eventos se a tabela existir
                 const tableCheck = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='events'").get();
                 if (tableCheck) {
                     let query = 'SELECT * FROM events WHERE class_name IS NULL';
@@ -5522,14 +5902,28 @@ app.get('/api/guardian/school-events', authenticateGuardian, (req, res) => {
                     const events = schoolDB.prepare(query).all(...params);
 
                     events.forEach(e => {
+                        let confirmCount = 0;
+                        try {
+                            // Check table existence first just in case
+                            const ccCheck = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='event_confirmations'").get();
+                            if (ccCheck) {
+                                confirmCount = schoolDB.prepare('SELECT COUNT(*) as count FROM event_confirmations WHERE event_id = ?').get(e.id).count;
+                            }
+                        } catch (err) { }
+
                         allEvents.push({
                             id: e.id,
-                            title: e.title, // Frontend espera title
+                            title: e.title,
                             description: e.description,
                             date: e.event_date,
+                            cost: e.cost,
+                            pix_key: e.pix_key,
+                            payment_deadline: e.payment_deadline,
                             school_name: school.name,
                             schoolId: school.id,
-                            type: e.type || 'event'
+                            school_id: school.id, // Compatibility
+                            type: e.type || 'event',
+                            confirmation_count: confirmCount
                         });
                     });
                 }
@@ -5556,66 +5950,83 @@ app.get('/api/guardian/school-events', authenticateGuardian, (req, res) => {
         res.status(500).json({ error: 'Erro ao buscar eventos' });
     }
 });
-// Mesma lógica de /api/guardian/events
-const guardianId = req.user.id;
-const db = getSystemDB();
-try {
-    const schools = db.prepare('SELECT id, name FROM schools').all();
-    let allEvents = [];
 
-    for (const school of schools) {
-        try {
-            const schoolDB = getSchoolDB(school.id);
-            let hasLink = false;
-            let myClasses = [];
+// POST: Confirm event participation / Upload Receipt
+const uploadConfirm = multer({ dest: 'uploads/' });
+app.post('/api/guardian/school-events/:schoolId/:eventId/confirm', authenticateGuardian, uploadConfirm.single('receipt'), (req, res) => {
+    const { schoolId, eventId } = req.params;
+    const guardianId = req.user.id;
 
-            try {
-                const linkCheck = schoolDB.prepare('SELECT 1 FROM student_guardians WHERE guardian_id = ? AND status = "active"').get(guardianId);
-                hasLink = !!linkCheck;
-                if (hasLink) {
-                    myClasses = schoolDB.prepare(`
-                            SELECT DISTINCT s.class_name 
-                            FROM students s
-                            JOIN student_guardians sg ON s.id = sg.student_id
-                            WHERE sg.guardian_id = ? AND sg.status = 'active'
-                        `).all(guardianId).map(r => r.class_name).filter(c => c);
-                }
-            } catch (e) {
-                // Tabela não existe ou outro erro
-            }
+    try {
+        const db = getSchoolDB(schoolId);
 
-            let query = 'SELECT * FROM events WHERE class_name IS NULL';
-            const params = [];
-
-            if (hasLink && myClasses.length > 0) {
-                query += ` OR class_name IN (${myClasses.map(() => '?').join(',')})`;
-                params.push(...myClasses);
-            }
-
-            query += ' ORDER BY created_at DESC LIMIT 20';
-
-            // Tabela events pode não existir
-            const tableCheck = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='events'").get();
-            if (tableCheck) {
-                const events = schoolDB.prepare(query).all(...params);
-                events.forEach(e => {
-                    e.school_name = school.name;
-                    e.schoolId = school.id;
-                    e.source = 'school_event';
-                    allEvents.push(e);
-                });
-            }
-        } catch (e) {
-            console.log('Erro na escola (school-events)', school.id, e.message);
+        // 1. Valida Vínculo (com fallback)
+        let linkCheck = db.prepare("SELECT 1 FROM student_guardians WHERE guardian_id = ? AND status = 'active'").get(guardianId);
+        if (!linkCheck) {
+            const altId = (typeof guardianId === 'number') ? String(guardianId) : Number(guardianId);
+            if (!isNaN(altId)) linkCheck = db.prepare("SELECT 1 FROM student_guardians WHERE guardian_id = ? AND status = 'active'").get(altId);
         }
-    }
+        if (!linkCheck) return res.status(403).json({ error: 'Sem vínculo ativo.' });
 
-    allEvents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    res.json({ events: allEvents }); // Importante: retornar { events: [] } conforme frontend espera
-} catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Erro ao buscar eventos' });
-}
+        // 2. Busca Evento e Alunos
+        const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+        if (!event) return res.status(404).json({ error: 'Evento não encontrado' });
+
+        // Pega alunos do responsável
+        let students = [];
+
+        if (event.class_name) {
+            students = db.prepare(`SELECT s.id FROM students s JOIN student_guardians sg ON s.id = sg.student_id WHERE sg.guardian_id = ? AND s.class_name = ?`).all(guardianId, event.class_name);
+            if (students.length === 0) {
+                const altId = (typeof guardianId === 'number') ? String(guardianId) : Number(guardianId);
+                if (!isNaN(altId)) students = db.prepare(`SELECT s.id FROM students s JOIN student_guardians sg ON s.id = sg.student_id WHERE sg.guardian_id = ? AND s.class_name = ?`).all(altId, event.class_name);
+            }
+        } else {
+            students = db.prepare(`SELECT s.id FROM students s JOIN student_guardians sg ON s.id = sg.student_id WHERE sg.guardian_id = ?`).all(guardianId);
+            if (students.length === 0) {
+                const altId = (typeof guardianId === 'number') ? String(guardianId) : Number(guardianId);
+                if (!isNaN(altId)) students = db.prepare(`SELECT s.id FROM students s JOIN student_guardians sg ON s.id = sg.student_id WHERE sg.guardian_id = ?`).all(altId);
+            }
+        }
+
+        if (students.length === 0) return res.status(400).json({ error: 'Nenhum aluno elegível encontrado.' });
+
+        // 3. Persistência
+        const receiptUrl = req.file ? `/uploads/${req.file.filename}` : null;
+        const now = new Date().toISOString();
+
+        // Check if table exists (just to fail gracefully if schema issue)
+        const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='event_participations'").get();
+        if (!tableCheck) return res.status(500).json({ error: 'Tabela de participações não encontrada.' });
+
+        const insertStmt = db.prepare("INSERT INTO event_participations (event_id, student_id, status, payment_proof_url, confirmed_at) VALUES (?, ?, ?, ?, ?)");
+        const updateStmt = db.prepare("UPDATE event_participations SET status = ?, payment_proof_url = COALESCE(?, payment_proof_url), confirmed_at = ? WHERE id = ?");
+        const checkStmt = db.prepare("SELECT id, payment_proof_url, status FROM event_participations WHERE event_id = ? AND student_id = ?");
+
+        const transaction = db.transaction(() => {
+            for (const student of students) {
+                const existing = checkStmt.get(eventId, student.id);
+
+                let newStatus = 'confirmed';
+                if (receiptUrl) newStatus = 'pending_review';
+                else if (existing && existing.payment_proof_url) newStatus = 'pending_review';
+                else if (existing && existing.status === 'paid') newStatus = 'paid';
+
+                if (existing) {
+                    updateStmt.run(newStatus, receiptUrl, now, existing.id);
+                } else {
+                    insertStmt.run(eventId, student.id, newStatus, receiptUrl, now);
+                }
+            }
+        });
+        transaction();
+
+        res.json({ success: true, message: 'Sucesso', status: 'ok' });
+
+    } catch (e) {
+        console.error('Confirm error:', e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // 13. GUARDIAN: Faturas (Financeiro)
@@ -5728,6 +6139,74 @@ app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => 
         res.json([]);
     }
 });
+
+// ==================== GUARDIAN: MY STUDENTS (with School Location) ====================
+app.get('/api/guardian/my-students', authenticateGuardian, (req, res) => {
+    const guardianId = req.user.id;
+    const systemDB = getSystemDB();
+
+    try {
+        console.log(`📚 [MY-STUDENTS] Guardian ${guardianId} solicitou lista de alunos`);
+
+        // Buscar todas as escolas
+        const schools = systemDB.prepare('SELECT id, name, address, number, zip_code, latitude, longitude FROM schools').all();
+        let allStudents = [];
+
+        for (const school of schools) {
+            try {
+                const schoolDB = getSchoolDB(school.id);
+
+                // Buscar alunos vinculados a este guardian nesta escola
+                const students = schoolDB.prepare(`
+                    SELECT 
+                        s.id,
+                        s.name,
+                        s.class_name,
+                        s.photo_url,
+                        s.age
+                    FROM students s
+                    JOIN student_guardians sg ON s.id = sg.student_id
+                    WHERE sg.guardian_id = ? AND sg.status = 'active'
+                `).all(guardianId);
+
+                // Adicionar informações da escola a cada aluno e contar mensagens não lidas
+                students.forEach(student => {
+                    let unreadCount = 0;
+                    try {
+                        const unread = schoolDB.prepare("SELECT COUNT(*) as count FROM messages WHERE student_id = ? AND sender_type = 'school' AND read_at IS NULL").get(student.id);
+                        unreadCount = unread ? unread.count : 0;
+                        console.log(`[DEBUG-CHAT] Aluno: ${student.name}, Não lidas: ${unreadCount}`);
+                    } catch (e) {
+                        console.error(`[DEBUG-CHAT] Erro ao contar mensagens: ${e.message}`);
+                    }
+
+                    allStudents.push({
+                        ...student,
+                        school_id: school.id,
+                        school_name: school.name,
+                        school_address: school.address,
+                        school_number: school.number,
+                        school_zip_code: school.zip_code,
+                        school_latitude: school.latitude,
+                        school_longitude: school.longitude,
+                        unread_messages: Number(unreadCount) // Garante que é número
+                    });
+                });
+
+            } catch (e) {
+                console.error(`Erro ao buscar alunos da escola ${school.id}:`, e.message);
+            }
+        }
+
+        console.log(`✅ [MY-STUDENTS] Retornando ${allStudents.length} alunos`);
+        res.json({ students: allStudents });
+
+    } catch (e) {
+        console.error('[MY-STUDENTS] Erro:', e);
+        res.status(500).json({ error: 'Erro ao buscar alunos', details: e.message });
+    }
+});
+
 
 // ==================== SERVIR FRONTEND (PRODUÇÃO) ====================
 // Serve os arquivos estáticos do Admin Panel (Pasta client/dist)
