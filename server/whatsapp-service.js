@@ -7,7 +7,9 @@
  * npm install @whiskeysockets/baileys qrcode-terminal pino
  */
 
-const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+// Módulos que serão carregados dinamicamente
+let makeWASocket, DisconnectReason, useMultiFileAuthState;
+
 const qrcode = require('qrcode-terminal');
 const pino = require('pino');
 const fs = require('fs');
@@ -87,6 +89,14 @@ class WhatsAppService {
             // Criar pasta de autenticação se não existir
             if (!fs.existsSync(this.authFolder)) {
                 fs.mkdirSync(this.authFolder, { recursive: true });
+            }
+
+            // Carregar Baileys dinamicamente (ESM)
+            if (!makeWASocket) {
+                const baileys = await import('@whiskeysockets/baileys');
+                makeWASocket = baileys.default;
+                DisconnectReason = baileys.DisconnectReason;
+                useMultiFileAuthState = baileys.useMultiFileAuthState;
             }
 
             const { state, saveCreds } = await useMultiFileAuthState(this.authFolder);
