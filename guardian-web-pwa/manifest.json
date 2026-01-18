@@ -2,7 +2,7 @@
     "name": "EduFocus Responsáveis",
     "short_name": "EduFocus",
     "description": "Acompanhe seu filho em tempo real",
-    "start_url": "/guardian-pwa/",
+    "start_url": "/",
     "display": "standalone",
     "background_color": "#0f172a",
     "theme_color": "#0f172a",

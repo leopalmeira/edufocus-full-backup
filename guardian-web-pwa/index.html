@@ -1398,6 +1398,17 @@
 
                     <!-- Stats Grid Removed by Request -->
 
+
+                    // --- PERMISSIONS REQUEST ---
+                    window.addEventListener('load', () => {
+                    if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(() => {}, () => {}, { enableHighAccuracy: true });
+                    }
+                    if ("Notification" in window && Notification.permission !== "granted") {
+                    Notification.requestPermission();
+                    }
+                    });
+
                     <!-- Calendar Controls -->
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 10px; border-radius: 12px; border: 1px solid #e5e7eb;">
