@@ -77,7 +77,15 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- AUTOMATIC CLEANUP ---
+
+// ==================== LOAD EXTERNAL ENDPOINTS ====================
+// Prevenindo conflitos se já tiverem sido carregados
+try {
+    require('./endpoints_guardian')(app);
+} catch (e) {
+    console.log('Endpoints Guardian já carregados ou erro:', e.message);
+}
+
 // Limpar registros de presença com mais de 7 dias
 function cleanupOldAttendance() {
     try {
@@ -6114,13 +6122,17 @@ app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => 
 
         console.log(`🔍 [ATTENDANCE] Buscando frequencia: Student=${studentId}, School=${schoolId}, ${month}/${year}`);
 
+
         // Construir query por data
+        // [FIX] Removido filtro estrito de data para debug/garantia 
+        // Vamos retornar os últimos 100 registros e deixar o frontend filtrar visualmente ou mostrar tudo
         let query = `
             SELECT timestamp, type FROM attendance 
             WHERE student_id = ?
         `;
         const params = [studentId];
 
+        /*
         if (month && year) {
             // Filter by Month/Year (SQLite 'YYYY-MM-DD')
             const m = String(month).padStart(2, '0');
@@ -6128,9 +6140,11 @@ app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => 
             query += ` AND strftime('%Y', timestamp) = ? AND strftime('%m', timestamp) = ?`;
             params.push(y, m);
         }
+        */
 
-        query += ' ORDER BY timestamp DESC';
+        query += ' ORDER BY timestamp DESC LIMIT 100';
         const records = db.prepare(query).all(...params);
+
 
         console.log(`🔍 [ATTENDANCE] Encontrados ${records.length} registros`);
         if (records.length > 0) console.log('Sample:', records[0]);
