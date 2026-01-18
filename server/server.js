@@ -6140,7 +6140,87 @@ app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => 
     }
 });
 
-// ==================== GUARDIAN: MY STUDENTS (with School Location) ====================
+
+// ==================== GUARDIAN AUTH ROUTES ====================
+
+// POST /api/guardian/register
+app.post('/api/guardian/register', async (req, res) => {
+    try {
+        const { email, password, name, phone } = req.body;
+        const db = getSystemDB();
+
+        if (!email || !password || !name) return res.status(400).json({ error: 'Dados incompletos' });
+
+        const existing = db.prepare('SELECT id FROM guardians WHERE email = ?').get(email);
+        if (existing) return res.status(409).json({ error: 'Email já cadastrado' });
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Tabela guardians deve existir (initSystemDB garante, mas por segurança)
+        const result = db.prepare(`
+            INSERT INTO guardians (email, password, name, phone) VALUES (?, ?, ?, ?)
+        `).run(email, hashedPassword, name, phone || '');
+
+        const token = jwt.sign({ id: result.lastInsertRowid, email }, SECRET_KEY, { expiresIn: '30d' });
+
+        res.status(201).json({
+            success: true,
+            message: 'Cadastro realizado',
+            data: { guardian: { id: result.lastInsertRowid, email, name }, token }
+        });
+    } catch (error) {
+        console.error('Erro no registro guardian:', error);
+        res.status(500).json({ error: 'Erro interno no cadastro' });
+    }
+});
+
+// POST /api/guardian/login
+app.post('/api/guardian/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const db = getSystemDB();
+
+        console.log(`🔐 [LOGIN GUARDIAN] Tentativa: ${email}`);
+
+        const guardian = db.prepare('SELECT * FROM guardians WHERE email = ?').get(email);
+
+        if (!guardian) {
+            console.log('❌ Usuário não encontrado');
+            return res.status(401).json({ error: 'Email não cadastrado' });
+        }
+
+        const valid = await bcrypt.compare(password, guardian.password);
+        if (!valid) {
+            console.log('❌ Senha incorreta');
+            return res.status(401).json({ error: 'Senha incorreta' });
+        }
+
+        const token = jwt.sign({ id: guardian.id, email: guardian.email }, SECRET_KEY, { expiresIn: '30d' });
+
+        console.log('✅ Login Sucesso:', guardian.id);
+
+        res.json({
+            success: true,
+            data: {
+                guardian: {
+                    id: guardian.id,
+                    email: guardian.email,
+                    name: guardian.name,
+                    phone: guardian.phone,
+                    photo_url: guardian.photo_url || null
+                },
+                token
+            }
+        });
+    } catch (error) {
+        console.error('Erro login guardian:', error);
+        res.status(500).json({ error: 'Erro interno no login' });
+    }
+});
+
+// ==================== END GUARDIAN AUTH ====================
+
+
 app.get('/api/guardian/my-students', authenticateGuardian, (req, res) => {
     const guardianId = req.user.id;
     const systemDB = getSystemDB();
