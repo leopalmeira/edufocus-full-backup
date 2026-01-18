@@ -6221,8 +6221,63 @@ app.post('/api/guardian/login', async (req, res) => {
 // ==================== END GUARDIAN AUTH ====================
 
 
+
+// ==================== SSE NOTIFICATIONS ====================
+
+
+// Middleware de Autenticação para Guardiões (Já definido acima)
+// const authenticateGuardian = ...
+
+
+app.get('/api/guardian/events', authenticateGuardian, (req, res) => {
+    const guardianId = req.user.id;
+    const db = getSystemDB();
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+
+    const interval = setInterval(() => {
+        try {
+            const schools = db.prepare('SELECT id, name FROM schools').all();
+            schools.forEach(school => {
+                try {
+                    const schoolDB = getSchoolDB(school.id);
+                    // Check if table exists to avoid crash
+                    const check = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='access_logs'").get();
+                    if (!check) return;
+
+                    const notifs = schoolDB.prepare(`
+                        SELECT al.id, al.student_id, s.name as student_name, s.class_name, al.event_type, al.timestamp
+                        FROM access_logs al
+                        JOIN students s ON al.student_id = s.id
+                        JOIN student_guardians sg ON s.id = sg.student_id
+                        WHERE sg.guardian_id = ? AND al.notified_guardian = 0
+                    `).all(guardianId);
+
+                    if (notifs.length > 0) {
+                        notifs.forEach(n => {
+                            res.write(`data: ${JSON.stringify({ type: 'notification', data: { ...n, school_name: school.name } })}\n\n`);
+                            // Mark as notified to avoid loop
+                            schoolDB.prepare('UPDATE access_logs SET notified_guardian = 1 WHERE id = ?').run(n.id);
+                        });
+                    }
+                } catch (e) { }
+            });
+        } catch (e) { console.error('SSE Error:', e.message); }
+    }, 3000);
+
+    req.on('close', () => {
+        clearInterval(interval);
+    });
+});
+
+
 app.get('/api/guardian/my-students', authenticateGuardian, (req, res) => {
     const guardianId = req.user.id;
+
     const systemDB = getSystemDB();
 
     try {
