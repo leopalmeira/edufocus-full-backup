@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baixar EduFocus Responsáveis</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#10b981">
+    <style>
+        :root {
+            --primary: #10b981;
+            --secondary: #3b82f6;
+            --dark: #111827;
+            --light: #f3f4f6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background: #0f172a;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        .hero {
+            position: relative;
+            padding: 4rem 2rem;
+            text-align: center;
+            background: radial-gradient(circle at 50% -20%, #10b981 0%, transparent 60%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+        }
+
+        .logo-container {
+            width: 120px;
+            height: 120px;
+            background: white;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2rem;
+            box-shadow: 0 20px 50px rgba(16, 185, 129, 0.3);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .logo-icon {
+            font-size: 60px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #10b981, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+
+        p {
+            font-size: 1.2rem;
+            color: #94a3b8;
+            max-width: 600px;
+            margin-bottom: 3rem;
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 1.2rem 3rem;
+            font-size: 1.2rem;
+            font-weight: 700;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.3s;
+            text-decoration: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-download:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(16, 185, 129, 0.5);
+        }
+
+        .btn-download::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: 0.5s;
+        }
+
+        .btn-download:hover::after {
+            left: 100%;
+        }
+
+        .btn-outline {
+            margin-top: 1.5rem;
+            color: #94a3b8;
+            text-decoration: none;
+            font-size: 1rem;
+            border-bottom: 1px solid transparent;
+            transition: 0.3s;
+        }
+
+        .btn-outline:hover {
+            color: white;
+            border-bottom-color: white;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: left;
+        }
+
+        .feature-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 1.5rem;
+        }
+
+        .install-guide {
+            margin-top: 4rem;
+            padding: 2rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 16px;
+            max-width: 800px;
+            text-align: left;
+            display: none;
+            /* Hidden by default, shown if install prompt fails */
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+
+        /* IOS specific */
+        .ios-instruction {
+            display: none;
+            background: #fff;
+            color: #333;
+            padding: 1rem;
+            border-radius: 12px;
+            margin-top: 1rem;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="hero">
+        <div class="logo-container">
+            <span class="logo-icon">🎓</span>
+        </div>
+
+        <h1>EduFocus<br>Responsáveis</h1>
+        <p>Acompanhe a vida escolar do seu filho em tempo real. Frequência, notas, mensagens e segurança na palma da sua
+            mão.</p>
+
+        <button id="installBtn" class="btn-download" hidden>
+            <span>📱</span> Baixar Aplicativo
+        </button>
+
+        <a href="index.html" class="btn-download" id="webBtn" style="display: none; background: #3b82f6;">
+            <span>🌐</span> Acessar via Navegador
+        </a>
+
+        <div id="iosInstruct" class="ios-instruction">
+            <span>Para instalar no iPhone: Toque em <strong>Compartilhar</strong> <img
+                    src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Apple_Share_Icon.svg/1200px-Apple_Share_Icon.svg.png"
+                    width="16"> e depois em <strong>Adicionar à Tela de Início</strong> ➕</span>
+        </div>
+
+        <a href="index.html" class="btn-outline">Já tenho instalado, abrir agora &rarr;</a>
+    </div>
+
+    <div class="features">
+        <div class="feature-card">
+            <div class="feature-icon">🔔</div>
+            <h3>Notificações em Tempo Real</h3>
+            <p style="margin-bottom: 0; font-size: 1rem;">Saiba exatamente quando seu filho chega na escola e quando
+                sai, com avisos instantâneos.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">📅</div>
+            <h3>Frequência Escolar</h3>
+            <p style="margin-bottom: 0; font-size: 1rem;">Histórico completo de presenças e faltas, visualizado em um
+                calendário intuitivo.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">💬</div>
+            <h3>Contato Direto</h3>
+            <p style="margin-bottom: 0; font-size: 1rem;">Fale diretamente com os professores e coordenação através do
+                chat integrado.</p>
+        </div>
+    </div>
+
+    <script>
+        let deferredPrompt;
+        const installBtn = document.getElementById('installBtn');
+        const webBtn = document.getElementById('webBtn');
+        const iosInstruct = document.getElementById('iosInstruct');
+
+        // Detect iOS
+        const isIos = () => {
+            const userAgent = window.navigator.userAgent.toLowerCase();
+            return /iphone|ipad|ipod/.test(userAgent);
+        }
+
+        if (isIos()) {
+            installBtn.style.display = 'none';
+            webBtn.style.display = 'flex';
+            iosInstruct.style.display = 'flex';
+        } else {
+            // Android / Desktop logic
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                installBtn.hidden = false;
+                webBtn.style.display = 'none'; // Hide web access if install is available
+                console.log('Install prompt captured');
+            });
+
+            // If installed, redirect or show open button
+            window.addEventListener('appinstalled', () => {
+                installBtn.hidden = true;
+                webBtn.style.display = 'flex';
+                webBtn.innerHTML = '<span>✅</span> Abrir Aplicativo';
+                console.log('App installed');
+            });
+
+            if (!deferredPrompt) {
+                // Fallback if already installed or not supported
+                installBtn.style.display = 'none';
+                webBtn.style.display = 'flex';
+            }
+        }
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`User response to the install prompt: ${outcome}`);
+                deferredPrompt = null;
+            }
+        });
+
+        // Service Worker Reg
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    console.log('SW Registered');
+                });
+            });
+        }
+    </script>
+</body>
+
+</html>
