@@ -1399,15 +1399,18 @@
                     <!-- Stats Grid Removed by Request -->
 
 
-                    // --- PERMISSIONS REQUEST ---
-                    window.addEventListener('load', () => {
-                    if ("geolocation" in navigator) {
-                    navigator.geolocation.getCurrentPosition(() => {}, () => {}, { enableHighAccuracy: true });
-                    }
-                    if ("Notification" in window && Notification.permission !== "granted") {
-                    Notification.requestPermission();
-                    }
-                    });
+
+                    <script>
+                        // --- PERMISSIONS REQUEST ---
+                        window.addEventListener('load', () => {
+                            if ("geolocation" in navigator) {
+                                navigator.geolocation.getCurrentPosition(() => { }, () => { }, { enableHighAccuracy: true });
+                            }
+                            if ("Notification" in window && Notification.permission !== "granted") {
+                                Notification.requestPermission();
+                            }
+                        });
+                    </script>
 
                     <!-- Calendar Controls -->
                     <div
