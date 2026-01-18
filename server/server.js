@@ -6108,12 +6108,11 @@ app.get('/api/guardian/invoices', authenticateGuardian, (req, res) => {
 app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => {
     const { schoolId, studentId, month, year } = req.query;
 
-    // Security check: Verify guardian owns this student link
-    // ... (skipped for speed, assuming studentId is from my-students)
-
     try {
         if (!schoolId || !studentId) throw new Error('Dados incompletos');
         const db = getSchoolDB(schoolId);
+
+        console.log(`🔍 [ATTENDANCE] Buscando frequencia: Student=${studentId}, School=${schoolId}, ${month}/${year}`);
 
         // Construir query por data
         let query = `
@@ -6132,6 +6131,10 @@ app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => 
 
         query += ' ORDER BY timestamp DESC';
         const records = db.prepare(query).all(...params);
+
+        console.log(`🔍 [ATTENDANCE] Encontrados ${records.length} registros`);
+        if (records.length > 0) console.log('Sample:', records[0]);
+
         res.json(records);
 
     } catch (e) {
@@ -6139,6 +6142,72 @@ app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => 
         res.json([]);
     }
 });
+
+// 15. GUARDIAN: Grades (Notas) - MOCK/Placeholder
+app.get('/api/guardian/grades', authenticateGuardian, (req, res) => {
+    // Retornando array vazio para evitar 404
+    res.json([]);
+});
+
+// 16. GUARDIAN: Reports (Relatórios) - MOCK/Placeholder
+app.get('/api/guardian/reports', authenticateGuardian, (req, res) => {
+    // Retornando array vazio para evitar 404
+    res.json([]);
+});
+
+// 17. GUARDIAN: Search Schools (Busca Escolas para Vínculo)
+app.get('/api/guardian/schools', (req, res) => {
+    const { search } = req.query;
+    if (!search || search.length < 3) return res.json([]);
+
+    const db = getSystemDB();
+    try {
+        const schools = db.prepare(`
+            SELECT id, name, city, state, 'https://placehold.co/100' as logo_url 
+            FROM schools 
+            WHERE name LIKE ? OR city LIKE ?
+            LIMIT 5
+        `).all(`%${search}%`, `%${search}%`);
+        res.json(schools);
+    } catch (e) {
+        console.error('Erro ao buscar escolas:', e);
+        res.status(500).json({ error: 'Erro busca escolas' });
+    }
+});
+
+// 18. GUARDIAN: Link Student (Vincular Filho)
+app.post('/api/guardian/link-student', authenticateGuardian, (req, res) => {
+    const { school_id, student_id } = req.body;
+    const guardianId = req.user.id;
+
+    console.log(`🔗 [LINK] Guardian ${guardianId} tentando vincular Student ${student_id} na School ${school_id}`);
+
+    try {
+        const schoolDB = getSchoolDB(school_id);
+
+        // Verificar se aluno existe
+        const student = schoolDB.prepare('SELECT id FROM students WHERE id = ?').get(student_id);
+        if (!student) return res.status(404).json({ success: false, message: 'Aluno não encontrado' });
+
+        // Verificar se já existe vínculo
+        const existing = schoolDB.prepare('SELECT id FROM student_guardians WHERE student_id = ? AND guardian_id = ?').get(student_id, guardianId);
+        if (existing) return res.status(400).json({ success: false, message: 'Já vinculado' });
+
+        // Criar vínculo
+        schoolDB.prepare(`
+            INSERT INTO student_guardians (student_id, guardian_id, status, linked_at) 
+            VALUES (?, ?, 'active', CURRENT_TIMESTAMP)
+        `).run(student_id, guardianId);
+
+        console.log(`✅ [LINK] Sucesso!`);
+        res.json({ success: true, message: 'Vinculado com sucesso' });
+
+    } catch (error) {
+        console.error('Erro ao vincular:', error);
+        res.status(500).json({ success: false, message: 'Erro ao vincular' });
+    }
+});
+
 
 
 // ==================== GUARDIAN AUTH ROUTES ====================
