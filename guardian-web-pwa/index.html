@@ -2742,10 +2742,10 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
         function updateStats() {
             // Count unique days present in this month view
             // Actually API returns records for this month. 
-            // We count distinct days with 'arrival'
+            // We count distinct days with 'arrival' or 'entry'
             const presentDays = new Set();
             currentAttendanceData.forEach(r => {
-                if (r.type === 'arrival') {
+                if (r.type === 'arrival' || r.type === 'entry') {
                     // Robusto para 'T' ou espaço
                     const datePart = r.timestamp.replace('T', ' ').split(' ')[0];
                     presentDays.add(datePart);
