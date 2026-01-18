@@ -1694,9 +1694,7 @@
     <script>
         // API Local (Porta 5000)
         // API Logic
-        const defaultApiUrl = window.location.hostname === 'localhost'
-            ? 'http://localhost:5000/api'
-            : `http://${window.location.hostname}:5000/api`;
+        const defaultApiUrl = 'https://edufocus-api-production.onrender.com/api';
 
         // Check for override
         const storedApiUrl = localStorage.getItem('custom_api_url');
