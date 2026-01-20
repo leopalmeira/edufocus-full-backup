@@ -1,3 +1,4 @@
+import { useRef, useState, useEffect } from 'react';
 import { LogOut, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -5,6 +6,28 @@ import { useNavigate } from 'react-router-dom';
 export default function Sidebar({ menuItems, activeTab, setActiveTab, isOpen, expandedMenus, toggleMenu, onAffiliateClick }) {
     const { logout } = useAuth();
     const navigate = useNavigate();
+
+    // Scroll Indicator Logic
+    const navRef = useRef(null);
+    const [canScrollDown, setCanScrollDown] = useState(false);
+
+    const checkScroll = () => {
+        if (navRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = navRef.current;
+            setCanScrollDown(scrollHeight > scrollTop + clientHeight + 10);
+        }
+    };
+
+    useEffect(() => {
+        checkScroll();
+        // Check again after a small delay to allow rendering
+        const timeout = setTimeout(checkScroll, 100);
+        window.addEventListener('resize', checkScroll);
+        return () => {
+            window.removeEventListener('resize', checkScroll);
+            clearTimeout(timeout);
+        };
+    }, [menuItems, expandedMenus, isOpen]);
 
     const handleLogout = () => {
         logout();
@@ -35,19 +58,22 @@ export default function Sidebar({ menuItems, activeTab, setActiveTab, isOpen, ex
                 </h2>
             </div>
 
-            <nav className="sidebar-nav">
+            <nav className="sidebar-nav" ref={navRef} onScroll={checkScroll}>
                 {menuItems.map((item, index) => {
                     // Render Section Title
                     if (item.section) {
                         return (
                             <div key={`section-${index}`} style={{
                                 fontSize: '0.75rem',
-                                fontWeight: '700',
-                                color: 'var(--text-secondary)',
+                                fontWeight: '800',
+                                color: '#818cf8', // Indigo claro para destaque
                                 textTransform: 'uppercase',
-                                padding: '1.25rem 1rem 0.5rem',
+                                padding: '1.25rem 0.5rem 0.25rem',
                                 letterSpacing: '0.05em',
-                                opacity: 0.8
+                                borderBottom: '1px solid rgba(129, 140, 248, 0.2)',
+                                marginBottom: '0.5rem',
+                                marginLeft: '0.25rem',
+                                marginRight: '0.25rem'
                             }}>
                                 {item.section}
                             </div>
@@ -163,6 +189,28 @@ export default function Sidebar({ menuItems, activeTab, setActiveTab, isOpen, ex
                     );
                 })}
             </nav>
+
+            {canScrollDown && (
+                <div className="animate-bounce" style={{
+                    position: 'absolute',
+                    bottom: '5.5rem',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 20,
+                    pointerEvents: 'none',
+                    color: '#fff',
+                    background: 'var(--accent-primary)',
+                    borderRadius: '50%',
+                    padding: '6px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: 0.9
+                }}>
+                    <ChevronDown size={20} />
+                </div>
+            )}
 
             <button
                 onClick={handleLogout}
