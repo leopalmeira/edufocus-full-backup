@@ -278,22 +278,53 @@ try {
 }
 
 // Middleware to verify token
+// Middleware to verify token
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
+        console.warn(`[AUTH] Falha: No token provided para ${req.url}`);
         return res.status(401).json({ message: 'No token provided' });
     }
 
     jwt.verify(token, SECRET_KEY, (err, user) => {
         if (err) {
-            return res.status(403).json({ message: 'Invalid or expired token' });
+            console.warn(`[AUTH] Falha: Token inválido/expirado para ${req.url}. Erro: ${err.message}`);
+            return res.status(403).json({ message: 'Invalid or expired token', error: err.message });
         }
+        // console.log(`[AUTH] Sucesso: User ${user.email} (${user.role}) em ${req.url}`);
         req.user = user;
         next();
     });
 };
+// ... (omitted) ...
+
+// Configurações da Escola (GPS e Endereço)
+app.get('/api/school/settings', authenticateToken, (req, res) => {
+    // Aceita school_admin ou super_admin
+    console.log(`[SETTINGS] GET recebido. User: ${req.user.email}, Role: ${req.user.role}`);
+
+    if (req.user.role !== 'school_admin' && req.user.role !== 'super_admin') {
+        console.warn(`[SETTINGS] Acesso negado: Role ${req.user.role} não permitido`);
+        return res.status(403).json({ error: 'Acesso negado: Apenas administradores podem acessar configurações.' });
+    }
+
+    const db = getSystemDB();
+    const id = req.user.school_id || req.user.id;
+
+    try {
+        const school = db.prepare('SELECT id, name, address, number, zip_code, latitude, longitude FROM schools WHERE id = ?').get(id);
+        if (!school) {
+            console.warn(`[SETTINGS] Escola ID ${id} não encontrada`);
+            return res.status(404).json({ error: 'Escola não encontrada' });
+        }
+        res.json(school);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Erro ao buscar settings' });
+    }
+});
 
 // Middleware to verify guardian token
 const authenticateGuardian = (req, res, next) => {
@@ -972,6 +1003,8 @@ app.get('/api/school/pickups', authenticateToken, (req, res) => {
     }
 });
 
+
+
 app.post('/api/school/pickups/:id/status', authenticateToken, (req, res) => {
     const { id } = req.params;
     const { status } = req.body; // 'calling', 'completed'
@@ -1182,7 +1215,10 @@ app.put('/api/school/students/:id', authenticateToken, (req, res) => {
 });
 
 // Delete student (DEEP CLEAN)
-app.delete('/api/school/students/:id', authenticateToken, (req, res) => {
+app.delete('/api/school/students/:id', (req, res, next) => {
+    console.log('[DEBUG] DELETE /students/:id headers:', req.headers);
+    next();
+}, authenticateToken, (req, res) => {
     if (req.user.role !== 'school_admin') return res.sendStatus(403);
     const { id } = req.params;
     const schoolDB = getSchoolDB(req.user.id);
@@ -2958,6 +2994,8 @@ app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => 
         return res.status(400).json({ error: 'School ID and Student ID are required' });
     }
 
+    console.log(`📊 [GUARDIAN-ATTENDANCE] Buscando: Student=${studentId}, School=${schoolId}, Guardian=${guardianId}, ${month}/${year}`);
+
     try {
         const schoolDB = getSchoolDB(schoolId);
 
@@ -2968,23 +3006,17 @@ app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => 
         `).get(studentId, guardianId);
 
         if (!link) {
+            console.warn(`⚠️ [GUARDIAN-ATTENDANCE] Acesso negado: Guardian ${guardianId} sem vínculo com Student ${studentId}`);
             return res.status(403).json({ error: 'Acesso negado. Você não tem vínculo ativo com este aluno nesta escola.' });
         }
 
-        // 2. Buscar frequência
-        let query = `SELECT * FROM attendance WHERE student_id = ?`;
+        // 2. Buscar frequência - retornar apenas timestamp e type
+        let query = `SELECT timestamp, type FROM attendance WHERE student_id = ?`;
         const params = [studentId];
 
         if (month && year) {
-            // SQLite strftime para filtrar por mês/ano
-            // month deve ser '01', '02', ..., '12'
-            // year deve ser '2025', etc.
             const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-            const endDate = `${year}-${String(month).padStart(2, '0')}-31`; // Simplificação, SQLite date function lida com dias excedentes se usar date()
-
-            // Melhor usar BETWEEN com datas completas
-            // Mas vamos usar strftime como no resto do codigo se houver padrao, 
-            // ou date(). Vamos usar date range simples.
+            const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
             query += ` AND date(timestamp) BETWEEN date(?) AND date(?)`;
             params.push(startDate, endDate);
         }
@@ -2992,6 +3024,12 @@ app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => 
         query += ` ORDER BY timestamp DESC`;
 
         const records = schoolDB.prepare(query).all(...params);
+
+        console.log(`📊 [GUARDIAN-ATTENDANCE] Encontrados ${records.length} registros`);
+        if (records.length > 0) {
+            console.log(`📊 [GUARDIAN-ATTENDANCE] Primeiro registro:`, records[0]);
+        }
+
         res.json(records);
 
     } catch (error) {
@@ -3847,18 +3885,27 @@ app.get('/api/technician/cameras', authenticateToken, (req, res) => {
             )
         `).run();
 
+        const CameraMonitorService = require('./services/CameraMonitorService');
+        const monitorStatus = CameraMonitorService.getAllStatuses();
+
         const cameras = db.prepare(`
             SELECT 
                 c.*,
-                s.name as school_name
+                s.name as school_name,
+                t.name as technician_name
             FROM cameras c
             LEFT JOIN schools s ON c.school_id = s.id
+            LEFT JOIN technicians t ON c.installed_by = t.id
             ORDER BY c.created_at DESC
         `).all();
 
-        // Para cada câmera, buscar turmas vinculadas
+        // Para cada câmera, buscar turmas vinculadas e status de monitoramento
         const camerasWithDetails = cameras.map(camera => {
             try {
+                // Status do Monitoramento SERVER-SIDE
+                const realTimeStatus = monitorStatus[camera.id];
+                const isMonitoring = realTimeStatus && realTimeStatus.status === 'connected';
+
                 const schoolDB = getSchoolDB(camera.school_id);
 
                 // Buscar turmas vinculadas via camera_classes
@@ -3880,9 +3927,16 @@ app.get('/api/technician/cameras', authenticateToken, (req, res) => {
                     }
                 }
 
+                const classroomDisplay = classroomNames.length > 0
+                    ? classroomNames.join(', ')
+                    : (camera.camera_purpose === 'entrance' ? 'Entrada da Escola' : 'N/A');
+
                 return {
                     ...camera,
-                    classroom_names: classroomNames.join(', ') || (camera.camera_purpose === 'entrance' ? 'Entrada da Escola' : 'N/A')
+                    classroom_names: classroomDisplay,
+                    monitoring_status: isMonitoring ? 'active' : 'inactive',
+                    monitoring_since: isMonitoring ? realTimeStatus.online_since : null,
+                    technician_name: camera.technician_name || 'Desconhecido'
                 };
             } catch (err) {
                 return {
@@ -5072,10 +5126,27 @@ app.get('/api/guardian/schools', (req, res) => {
 // Listar turmas de uma escola específica
 app.get('/api/guardian/schools/:schoolId/classes', authenticateGuardian, (req, res) => {
     const { schoolId } = req.params;
+    console.log(`📚 [GUARDIAN-CLASSES] Buscando turmas da escola ${schoolId}`);
+
     try {
         const schoolDB = getSchoolDB(schoolId);
-        // Buscar turmas que têm alunos
-        const classes = schoolDB.prepare('SELECT DISTINCT class_name as name FROM students WHERE class_name IS NOT NULL ORDER BY class_name').all();
+
+        // Primeiro tentar buscar da tabela classes (se existir)
+        let classes = [];
+        try {
+            classes = schoolDB.prepare('SELECT name FROM classes ORDER BY name').all();
+            console.log(`📚 [GUARDIAN-CLASSES] Turmas da tabela classes: ${classes.length}`);
+        } catch (e) {
+            console.log('📚 [GUARDIAN-CLASSES] Tabela classes não existe, buscando de students...');
+        }
+
+        // Se não encontrar, buscar turmas únicas da tabela students
+        if (classes.length === 0) {
+            classes = schoolDB.prepare('SELECT DISTINCT class_name as name FROM students WHERE class_name IS NOT NULL AND class_name != "" ORDER BY class_name').all();
+            console.log(`📚 [GUARDIAN-CLASSES] Turmas de students: ${classes.length}`);
+        }
+
+        console.log(`📚 [GUARDIAN-CLASSES] Total de turmas encontradas: ${classes.length}`);
         res.json(classes);
     } catch (error) {
         console.error('Erro ao listar turmas:', error);
@@ -6122,32 +6193,30 @@ app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => 
 
         console.log(`🔍 [ATTENDANCE] Buscando frequencia: Student=${studentId}, School=${schoolId}, ${month}/${year}`);
 
-
-        // Construir query por data
-        // [FIX] Removido filtro estrito de data para debug/garantia 
-        // Vamos retornar os últimos 100 registros e deixar o frontend filtrar visualmente ou mostrar tudo
+        // Buscar tanto da tabela attendance quanto access_logs para garantir dados completos
         let query = `
             SELECT timestamp, type FROM attendance 
             WHERE student_id = ?
         `;
         const params = [studentId];
 
-        /*
+        // Aplicar filtro de mês/ano se fornecido
         if (month && year) {
-            // Filter by Month/Year (SQLite 'YYYY-MM-DD')
             const m = String(month).padStart(2, '0');
             const y = String(year);
-            query += ` AND strftime('%Y', timestamp) = ? AND strftime('%m', timestamp) = ?`;
-            params.push(y, m);
+            const startDate = `${y}-${m}-01`;
+            const endDate = `${y}-${m}-31`;
+            query += ` AND date(timestamp) BETWEEN date(?) AND date(?)`;
+            params.push(startDate, endDate);
         }
-        */
 
-        query += ' ORDER BY timestamp DESC LIMIT 100';
+        query += ' ORDER BY timestamp DESC';
         const records = db.prepare(query).all(...params);
 
-
-        console.log(`🔍 [ATTENDANCE] Encontrados ${records.length} registros`);
-        if (records.length > 0) console.log('Sample:', records[0]);
+        console.log(`🔍 [ATTENDANCE] Encontrados ${records.length} registros na tabela attendance`);
+        if (records.length > 0) {
+            console.log('Sample:', records[0]);
+        }
 
         res.json(records);
 
@@ -6462,6 +6531,14 @@ const startServer = async () => {
         await reconnectWhatsAppSessions();
     } catch (err) {
         console.error('Erro ao reconectar sessões WhatsApp:', err);
+    }
+
+    // 3. Iniciar Serviço de Monitoramento de Câmeras (Backend Centralizado)
+    try {
+        const CameraMonitorService = require('./services/CameraMonitorService');
+        CameraMonitorService.start();
+    } catch (err) {
+        console.error('❌ Erro ao iniciar CameraMonitorService:', err);
     }
 
     app.listen(PORT, '0.0.0.0', () => {

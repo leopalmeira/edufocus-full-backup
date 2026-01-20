@@ -27,6 +27,7 @@ export default function SuperAdminDashboard() {
         { id: 'billing', label: 'Faturamento', icon: <DollarSign size={20} /> },
         { id: 'representatives', label: 'Representantes', icon: <Users size={20} /> },
         { id: 'infrastructure', label: 'Infraestrutura', icon: <Wrench size={20} /> },
+        { id: 'cameras', label: 'Monitoramento Câmeras', icon: <Camera size={20} /> },
         { id: 'camera-requests', label: 'Solicitações Câmeras', icon: <Camera size={20} /> },
         { id: 'whatsapp', label: 'WhatsApp', icon: <MessageCircle size={20} /> },
         { id: 'support', label: 'Suporte', icon: <MessageSquare size={20} /> }
@@ -87,6 +88,7 @@ export default function SuperAdminDashboard() {
                 {activeTab === 'billing' && <SuperAdminSaaS />}
                 {activeTab === 'representatives' && <RepresentativesTab />}
                 {activeTab === 'infrastructure' && <InfrastructureTab />}
+                {activeTab === 'cameras' && <CamerasTab />}
                 {activeTab === 'camera-requests' && <CameraRemovalRequests />}
                 {activeTab === 'whatsapp' && <WhatsAppPanel />}
                 {activeTab === 'support' && <AdminSupportTickets />}

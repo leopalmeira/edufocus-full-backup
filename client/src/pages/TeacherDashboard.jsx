@@ -675,6 +675,15 @@ export default function TeacherDashboard() {
                         emotions={emotions}
                     />
                 )}
+
+                {/* Botão de Logout Flutuante para Tablets/Mobile */}
+                <button
+                    className="floating-logout-btn"
+                    onClick={logout}
+                    title="Sair"
+                >
+                    <LogOut size={24} />
+                </button>
             </div>
         </div>
     );

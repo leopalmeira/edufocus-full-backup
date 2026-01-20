@@ -60,9 +60,13 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = () => {
+        console.log('🚪 Saindo do sistema...');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('selectedSchoolId');
         setUser(null);
+        // Forçar redirecionamento para página de login
+        window.location.href = '/';
     };
 
     return (

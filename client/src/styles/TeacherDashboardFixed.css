@@ -1633,3 +1633,39 @@
     font-weight: bold;
     padding: 0 6px;
 }
+
+/* Floating Logout Button for Tablets/Mobile */
+.floating-logout-btn {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 999;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border: none;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+    transition: all 0.3s ease;
+    align-items: center;
+    justify-content: center;
+}
+
+.floating-logout-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 25px rgba(239, 68, 68, 0.6);
+}
+
+.floating-logout-btn:active {
+    transform: scale(0.95);
+}
+
+/* Show floating logout on tablets/mobile when sidebar is hidden */
+@media (max-width: 1300px) {
+    .floating-logout-btn {
+        display: flex;
+    }
+}

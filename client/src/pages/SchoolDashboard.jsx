@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, GraduationCap, ClipboardCheck, HelpCircle, FileText, BarChart3, MessageCircle, Menu, Camera, Clock, Calendar, Building2, Edit, Save, X, DollarSign } from 'lucide-react';
+import { Users, GraduationCap, ClipboardCheck, HelpCircle, FileText, BarChart3, MessageCircle, Menu, Camera, Clock, Calendar, Building2, Edit, Save, X, DollarSign, LogOut } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import WhatsAppPanel from '../components/WhatsAppPanel'; // Manter caso queira voltar
 import SchoolCommunicationPanel from '../components/SchoolCommunicationPanel';
@@ -25,13 +25,15 @@ import FinancialPanel from '../components/FinancialPanel';
 import SchoolSaaSBilling from '../components/SchoolSaaSBilling';
 import OnboardingTour from '../components/OnboardingTour';
 import { useAuth } from '../context/AuthContext';
+import '../styles/TeacherDashboardFixed.css';
 
 export default function SchoolDashboard() {
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
     const schoolId = user?.id || 1; // ID da escola logada
-    const [activeTab, setActiveTab] = useState('teachers');
+    const [activeTab, setActiveTab] = useState('dashboard');
     const [teachers, setTeachers] = useState([]);
     const [students, setStudents] = useState([]);
+    const [employees, setEmployees] = useState([]);
     const [searchEmail, setSearchEmail] = useState('');
     const [showLinkModal, setShowLinkModal] = useState(false);
     const [showStudentForm, setShowStudentForm] = useState(false);
@@ -151,6 +153,24 @@ export default function SchoolDashboard() {
         loadAffiliates();
     }, []);
 
+    const loadEmployees = async () => {
+        try {
+            const res = await api.get('/school/employees');
+            setEmployees(res.data || []);
+        } catch (err) {
+            console.error('Erro ao carregar funcionários:', err);
+        }
+    };
+
+    const loadCameras = async () => {
+        try {
+            const res = await api.get('/school/cameras');
+            setCameras(res.data || []);
+        } catch (err) {
+            console.error('Erro ao carregar câmeras:', err);
+        }
+    };
+
     const loadAffiliates = async () => {
         try {
             const res = await api.get('/school/affiliates/list');
@@ -177,6 +197,7 @@ export default function SchoolDashboard() {
 
     // Build menu items with dynamic affiliates submenu
     const menuItems = [
+        { id: 'dashboard', label: 'Visão Geral', icon: <BarChart3 size={20} /> },
         { id: 'teachers', label: 'Professores', icon: <GraduationCap size={20} /> },
         { id: 'classes', label: 'Turmas', icon: <Users size={20} /> },
         {
@@ -294,6 +315,13 @@ export default function SchoolDashboard() {
     }, [user]);
 
     useEffect(() => {
+        if (activeTab === 'dashboard') {
+            loadTeachers();
+            loadClasses();
+            loadStudents();
+            loadCameras();
+            loadEmployees();
+        }
         if (activeTab === 'teachers') {
             loadTeachers();
             loadClasses(); // Load classes for linking modal
@@ -314,14 +342,7 @@ export default function SchoolDashboard() {
         }
     }, [activeTab, currentSchoolId]);
 
-    const loadCameras = async () => {
-        try {
-            const res = await api.get('/school/cameras');
-            setCameras(res.data);
-        } catch (err) {
-            console.error('Erro ao carregar câmeras:', err);
-        }
-    };
+
 
     const requestCameraRemoval = async (cameraId, cameraName) => {
         const reason = prompt(`📝 Motivo da remoção da câmera "${cameraName}":\n(Esta solicitação será enviada para aprovação do Super Admin)`);
@@ -626,81 +647,236 @@ export default function SchoolDashboard() {
             />
 
             <div className="main-content">
-                {/* School Header */}
-                <div style={{
-                    marginBottom: '1.5rem',
-                    padding: '1.5rem',
-                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1))',
-                    borderRadius: 'var(--radius)',
-                    border: '1px solid rgba(99, 102, 241, 0.2)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'start'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{
-                            width: '48px',
-                            height: '48px',
-                            borderRadius: '12px',
-                            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1.5rem',
-                            fontWeight: '700',
-                            color: 'white'
-                        }}>
-                            {user?.name?.charAt(0) || 'E'}
+                {activeTab === 'dashboard' && (
+                    <div className="fade-in" style={{ paddingBottom: '3rem' }}>
+                        {/* Header Minimalista */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                            <div>
+                                <h2 style={{ fontSize: '1.8rem', fontWeight: '700', color: 'var(--text-primary)' }}>Visão Geral</h2>
+                                <p style={{ color: 'var(--text-secondary)' }}>Resumo em tempo real da sua escola</p>
+                            </div>
+                            <button
+                                className="btn"
+                                onClick={openEditSchoolModal}
+                                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', gap: '0.5rem', alignItems: 'center' }}
+                            >
+                                <Edit size={16} /> Configurações
+                            </button>
                         </div>
-                        <div>
-                            <h1 style={{
-                                fontSize: '1.75rem',
-                                fontWeight: '700',
-                                marginBottom: '0.25rem',
-                                background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                backgroundClip: 'text'
-                            }}>
-                                {user?.name || 'Escola'}
-                            </h1>
-                            <p style={{
-                                fontSize: '0.875rem',
-                                color: 'var(--text-secondary)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                flexWrap: 'wrap'
-                            }}>
-                                <span>📧 {user?.email}</span>
-                                {user?.cnpj && <span>• 🏢 CNPJ: {user?.cnpj}</span>}
-                                {user?.address && <span>• 📍 {user?.address}</span>}
-                            </p>
+
+                        {/* Métricas Principais - Estilo "Python Dashboard" */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+
+                            {/* Card Alunos */}
+                            <div style={{ position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                                <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.1, color: '#3b82f6' }}>
+                                    <Users size={100} />
+                                </div>
+                                <h3 style={{ fontSize: '3.5rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#3b82f6' }}>{students.length}</h3>
+                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem' }}>Total de Alunos</p>
+                            </div>
+
+                            {/* Card Professores */}
+                            <div style={{ position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                                <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.1, color: '#8b5cf6' }}>
+                                    <GraduationCap size={100} />
+                                </div>
+                                <h3 style={{ fontSize: '3.5rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#8b5cf6' }}>{teachers.length}</h3>
+                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem' }}>Professores Ativos</p>
+                            </div>
+
+                            {/* Card Turmas */}
+                            <div style={{ position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                                <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.1, color: '#f59e0b' }}>
+                                    <Users size={100} />
+                                </div>
+                                <h3 style={{ fontSize: '3.5rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#f59e0b' }}>{classes.length}</h3>
+                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem' }}>Turmas Cadastradas</p>
+                            </div>
+
+
+                            {/* Card Funcionários */}
+                            <div style={{ position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)', border: '1px solid rgba(236, 72, 153, 0.2)' }}>
+                                <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.1, color: '#ec4899' }}>
+                                    <Users size={100} />
+                                </div>
+                                <h3 style={{ fontSize: '3.5rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#ec4899' }}>{employees.length}</h3>
+                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem' }}>Funcionários</p>
+                            </div>
+
+                            {/* Card Câmeras */}
+                            <div style={{ position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                                <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.1, color: '#10b981' }}>
+                                    <Camera size={100} />
+                                </div>
+                                <h3 style={{ fontSize: '3.5rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#10b981' }}>{cameras?.length || 0}</h3>
+                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem' }}>Câmeras Online</p>
+                            </div>
+                        </div>
+
+                        {/* Seção Gráficos e Detalhes */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+
+                            {/* Gráfico Fake de Barras: Alunos por Turma */}
+                            <div style={{ padding: '1.5rem', borderRadius: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+                                <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <BarChart3 size={18} /> Distribuição de Alunos por Turma
+                                </h4>
+                                <div style={{ display: 'flex', alignItems: 'flex-end', height: '200px', gap: '12px', paddingBottom: '5px' }}>
+                                    {/* Lógica para gerar barras dinamicamente */}
+                                    {Object.entries(students.reduce((acc, s) => {
+                                        const cls = s.class_name || 'S/ Turma';
+                                        acc[cls] = (acc[cls] || 0) + 1;
+                                        return acc;
+                                    }, {})).slice(0, 10).map(([cls, count], i, arr) => {
+                                        const max = Math.max(...arr.map(a => a[1])) || 1;
+                                        const height = (count / max) * 100;
+                                        return (
+                                            <div key={cls} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
+                                                <div className="tooltip-container" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                                                    <div style={{
+                                                        width: '100%',
+                                                        height: `${height}%`,
+                                                        background: `hsl(${210 + (i * 15)}, 70%, 60%)`,
+                                                        borderRadius: '4px 4px 0 0',
+                                                        opacity: 0.8,
+                                                        transition: 'height 0.5s ease'
+                                                    }} />
+                                                    <span className="tooltip">{count} alunos</span>
+                                                </div>
+                                                <span style={{ fontSize: '10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{cls}</span>
+                                            </div>
+                                        );
+                                    })}
+                                    {students.length === 0 && <p style={{ width: '100%', textAlign: 'center', color: 'var(--text-secondary)' }}>Sem dados para exibir</p>}
+                                </div>
+                            </div>
+
+                            {/* Lista de Acesso Rápido Estilizada */}
+                            <div style={{ padding: '1.5rem', borderRadius: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+                                <h4 style={{ marginBottom: '1.5rem' }}>Ações Rápidas</h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <button
+                                        onClick={() => setActiveTab('students')}
+                                        style={{ padding: '1.5rem', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.1)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}
+                                        className="hover-card"
+                                    >
+                                        <Users size={24} style={{ color: '#3b82f6', marginBottom: '0.5rem' }} />
+                                        <div style={{ fontWeight: '600' }}>Gerenciar Alunos</div>
+                                    </button>
+
+                                    <button
+                                        onClick={() => setActiveTab('attendance')}
+                                        style={{ padding: '1.5rem', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.1)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}
+                                        className="hover-card"
+                                    >
+                                        <ClipboardCheck size={24} style={{ color: '#10b981', marginBottom: '0.5rem' }} />
+                                        <div style={{ fontWeight: '600' }}>Presença</div>
+                                    </button>
+
+                                    <button
+                                        onClick={() => setActiveTab('teachers')}
+                                        style={{ padding: '1.5rem', borderRadius: '12px', background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.1)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}
+                                        className="hover-card"
+                                    >
+                                        <GraduationCap size={24} style={{ color: '#8b5cf6', marginBottom: '0.5rem' }} />
+                                        <div style={{ fontWeight: '600' }}>Professores</div>
+                                    </button>
+
+                                    <button
+                                        onClick={() => setActiveTab('financial')}
+                                        style={{ padding: '1.5rem', borderRadius: '12px', background: 'rgba(236, 72, 153, 0.05)', border: '1px solid rgba(236, 72, 153, 0.1)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}
+                                        className="hover-card"
+                                    >
+                                        <DollarSign size={24} style={{ color: '#ec4899', marginBottom: '0.5rem' }} />
+                                        <div style={{ fontWeight: '600' }}>Financeiro</div>
+                                    </button>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
-                    <button
-                        onClick={openEditSchoolModal}
-                        className="btn"
-                        style={{
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                            padding: '0.5rem',
-                            minWidth: 'auto'
-                        }}
-                        title="Editar Informações da Escola"
-                    >
-                        <Edit size={18} />
-                    </button>
-                </div>
+                )}
 
-                <SchoolSelector
-                    currentSchoolId={currentSchoolId}
-                    onSchoolChange={(school) => {
-                        console.log('Escola alterada:', school);
-                        // Recarregar dados da nova escola
-                        window.location.reload();
-                    }}
-                />
+                {activeTab !== 'dashboard' && (
+                    <>
+                        {/* School Header */}
+                        <div style={{
+                            marginBottom: '1.5rem',
+                            padding: '1.5rem',
+                            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1))',
+                            borderRadius: 'var(--radius)',
+                            border: '1px solid rgba(99, 102, 241, 0.2)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'start'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: '12px',
+                                    background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '1.5rem',
+                                    fontWeight: '700',
+                                    color: 'white'
+                                }}>
+                                    {user?.name?.charAt(0) || 'E'}
+                                </div>
+                                <div>
+                                    <h1 style={{
+                                        fontSize: '1.75rem',
+                                        fontWeight: '700',
+                                        marginBottom: '0.25rem',
+                                        background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        backgroundClip: 'text'
+                                    }}>
+                                        {user?.name || 'Escola'}
+                                    </h1>
+                                    <p style={{
+                                        fontSize: '0.875rem',
+                                        color: 'var(--text-secondary)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        flexWrap: 'wrap'
+                                    }}>
+                                        <span>📧 {user?.email}</span>
+                                        {user?.cnpj && <span>• 🏢 CNPJ: {user?.cnpj}</span>}
+                                        {user?.address && <span>• 📍 {user?.address}</span>}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="tooltip-container">
+                                <button
+                                    className="btn btn-icon"
+                                    onClick={openEditSchoolModal}
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.1)',
+                                        border: '1px solid rgba(255, 255, 255, 0.2)'
+                                    }}
+                                >
+                                    <Edit size={18} />
+                                </button>
+                                <span className="tooltip">Editar Informações da Escola</span>
+                            </div>
+                        </div>
+
+                        <SchoolSelector
+                            currentSchoolId={currentSchoolId}
+                            onSchoolChange={(school) => {
+                                console.log('Escola alterada:', school);
+                                // Recarregar dados da nova escola
+                                window.location.reload();
+                            }}
+                        />
+                    </>
+                )}
                 {activeTab === 'teachers' && (
                     <div className="fade-in">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -1261,7 +1437,7 @@ export default function SchoolDashboard() {
 
                         <div className="modal-actions">
                             <button className="btn" onClick={() => setIsEditSchoolModalOpen(false)}>Cancelar</button>
-                            <button className="btn btn-primary" onClick={handleSaveSchoolEdit}>Salvar</button>
+                            <button className="btn btn-primary" onClick={handleUpdateSchool}>Salvar</button>
                         </div>
                     </div>
                 </div>
@@ -1275,6 +1451,15 @@ export default function SchoolDashboard() {
                     isFirstVisit={isFirstVisit}
                 />
             )}
+
+            {/* Botão de Logout Flutuante para Tablets/Mobile */}
+            <button
+                className="floating-logout-btn"
+                onClick={logout}
+                title="Sair"
+            >
+                <LogOut size={24} />
+            </button>
         </div>
     );
 }

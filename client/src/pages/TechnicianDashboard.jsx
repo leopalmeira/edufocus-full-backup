@@ -46,8 +46,17 @@ export default function TechnicianDashboard() {
     useEffect(() => {
         document.body.classList.add('force-landscape');
         loadSchools();
-        loadCameras();
-        return () => document.body.classList.remove('force-landscape');
+        loadCameras(); // Carregamento inicial
+
+        // Polling para atualizar status das câmeras (IA, Conexão) a cada 10 segundos
+        const interval = setInterval(() => {
+            loadCameras();
+        }, 10000);
+
+        return () => {
+            document.body.classList.remove('force-landscape');
+            clearInterval(interval);
+        };
     }, []);
 
     // Carregar salas quando escola selecionada
@@ -661,8 +670,20 @@ export default function TechnicianDashboard() {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                 <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: camera.status === 'active' ? 'var(--success)' : 'var(--danger)' }}></div>
                                                 <span style={{ color: camera.status === 'active' ? 'var(--success)' : 'var(--danger)', fontSize: '0.875rem', fontWeight: '600' }}>
-                                                    {camera.status === 'active' ? 'Online' : 'Offline'}
+                                                    {camera.status === 'active' ? 'Conexão Online' : 'Conexão Offline'}
                                                 </span>
+                                            </div>
+
+                                            {/* Status Monitoramento IA Server-Side */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: camera.monitoring_status === 'active' ? '#3b82f6' : '#64748b' }}></div>
+                                                <span style={{ fontSize: '0.8rem', fontWeight: '600', color: camera.monitoring_status === 'active' ? '#3b82f6' : 'var(--text-secondary)' }}>
+                                                    {camera.monitoring_status === 'active' ? '👁️ IA Monitorando Rostos' : '👁️ IA Inativa'}
+                                                </span>
+                                            </div>
+
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                                🛠️ Instalado por: {camera.technician_name || 'Desconhecido'}
                                             </div>
                                             <button
                                                 className="btn"

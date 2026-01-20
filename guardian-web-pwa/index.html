@@ -1719,13 +1719,16 @@
     </div>
 
     <script>
-        // API Local (Porta 5000)
-        // API Logic
-        const defaultApiUrl = 'https://edufocus-api-production.onrender.com/api';
+        // API Logic - Detecta ambiente automaticamente
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const defaultApiUrl = isLocalhost
+            ? 'http://localhost:5000/api'
+            : 'https://edufocus-api-production.onrender.com/api';
 
         // Check for override
         const storedApiUrl = localStorage.getItem('custom_api_url');
         const API_URL = storedApiUrl || defaultApiUrl;
+        console.log('🌐 [CONFIG] API_URL:', API_URL, isLocalhost ? '(localhost)' : '(produção)');
 
         function saveApiUrl() {
             const val = document.getElementById('settingsApiUrl').value;
@@ -2514,6 +2517,11 @@
 
                 const data = await res.json();
                 myStudentsData = data.students || [];
+                console.log('👨‍👩‍👧 [MY-STUDENTS] Dados recebidos:', myStudentsData);
+                if (myStudentsData.length > 0) {
+                    console.log('👨‍👩‍👧 [MY-STUDENTS] Primeiro aluno:', myStudentsData[0]);
+                    console.log('👨‍👩‍👧 [MY-STUDENTS] ID do primeiro aluno:', myStudentsData[0].id, 'school_id:', myStudentsData[0].school_id);
+                }
 
                 if (myStudentsData.length === 0) {
                     childrenList.innerHTML = `
@@ -2654,13 +2662,37 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
             try {
                 const token = localStorage.getItem('token');
                 const url = `${API_URL}/guardian/student-attendance?schoolId=${schoolId}&studentId=${studentId}&month=${month}&year=${year}`;
+                console.log('📊 [ATTENDANCE] Buscando frequência:', url);
+
                 const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
                 const data = await res.json(); // Array of {timestamp, type}
 
-                currentAttendanceData = data || [];
+                console.log('📊 [ATTENDANCE] Dados recebidos:', data);
+                console.log('📊 [ATTENDANCE] Total de registros:', data?.length || 0);
+                if (data && data.length > 0) {
+                    console.log('📊 [ATTENDANCE] Primeiro registro:', data[0]);
+                }
+
+                // Normalizar os dados para garantir consistência
+                currentAttendanceData = (data || []).map(record => {
+                    // Garantir que o timestamp está em formato padrão YYYY-MM-DD...
+                    let ts = record.timestamp || '';
+
+                    // Se o timestamp vier em formato ISO (com T), manter
+                    // Se vier em outro formato, tentar normalizar
+                    if (typeof ts === 'string' && ts.includes(' ')) {
+                        // Formato "YYYY-MM-DD HH:MM:SS" - converter para ISO
+                        ts = ts.replace(' ', 'T');
+                    }
+
+                    return {
+                        ...record,
+                        timestamp: ts
+                    };
+                });
+
+                console.log('📊 [ATTENDANCE] Dados normalizados:', currentAttendanceData);
                 renderCalendar();
-                renderCalendar();
-                // updateStats(); // Removed: renderCalendar already updates stats correctly
 
             } catch (e) {
                 console.error("Erro ao carregar frequencia:", e);
