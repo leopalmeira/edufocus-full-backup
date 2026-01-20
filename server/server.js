@@ -1260,9 +1260,19 @@ app.delete('/api/school/students/:id', (req, res, next) => {
 
 app.get('/api/school/cameras', authenticateToken, (req, res) => {
     if (req.user.role !== 'school_admin') return res.sendStatus(403);
-    const schoolDB = getSchoolDB(req.user.id);
-    const cameras = schoolDB.prepare('SELECT * FROM cameras').all();
-    res.json(cameras);
+
+    // Câmeras são armazenadas no banco system, não no banco da escola
+    const db = getSystemDB();
+    const schoolId = req.user.id;
+
+    try {
+        const cameras = db.prepare('SELECT * FROM cameras WHERE school_id = ?').all(schoolId);
+        console.log(`📹 [CAMERAS] Escola ${schoolId} tem ${cameras.length} câmera(s) cadastrada(s)`);
+        res.json(cameras);
+    } catch (err) {
+        console.error('Erro ao buscar câmeras:', err);
+        res.json([]); // Retorna array vazio se tabela não existir
+    }
 });
 
 // ==================== ENDPOINTS DE FUNCIONÁRIOS ====================
