@@ -66,11 +66,11 @@ export default function Sidebar({ menuItems, activeTab, setActiveTab, isOpen, ex
                             <div key={`section-${index}`} style={{
                                 fontSize: '0.7rem',
                                 fontWeight: '700',
-                                color: 'var(--text-secondary)',
+                                color: '#60a5fa', // Azul claro para diferenciar seções
                                 textTransform: 'uppercase',
                                 padding: '1.5rem 0.75rem 0.5rem',
                                 letterSpacing: '0.12em',
-                                borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
+                                borderBottom: '1px solid rgba(96, 165, 250, 0.1)', // Linha sutil na mesma cor
                                 marginBottom: '0.25rem',
                                 transition: 'color 0.3s'
                             }}>
