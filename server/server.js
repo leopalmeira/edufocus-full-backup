@@ -3970,6 +3970,13 @@ app.post('/api/technician/cameras', authenticateToken, async (req, res) => {
         notes
     } = req.body;
 
+    console.log('📸 [DEBUG CAMERAS] Recebendo requisição de cadastro:', {
+        school_id,
+        camera_name,
+        camera_purpose,
+        user: req.user.id
+    });
+
     // Validação básica
     if (!school_id || !camera_name || !camera_url) {
         return res.status(400).json({ message: 'Dados obrigatórios faltando (school_id, camera_name, camera_url)' });
@@ -4037,6 +4044,7 @@ app.post('/api/technician/cameras', authenticateToken, async (req, res) => {
         );
 
         const cameraId = result.lastInsertRowid;
+        console.log(`✅ [DEBUG CAMERAS] Câmera inserida com sucesso. ID: ${cameraId}, School: ${school_id}, Nome: ${camera_name}`);
 
         // Inserir relacionamento com turmas (se sala de aula)
         if (purpose === 'classroom' && assigned_classes && assigned_classes.length > 0) {
