@@ -64,16 +64,15 @@ export default function Sidebar({ menuItems, activeTab, setActiveTab, isOpen, ex
                     if (item.section) {
                         return (
                             <div key={`section-${index}`} style={{
-                                fontSize: '0.75rem',
-                                fontWeight: '800',
-                                color: '#818cf8', // Indigo claro para destaque
+                                fontSize: '0.7rem',
+                                fontWeight: '700',
+                                color: 'var(--text-secondary)',
                                 textTransform: 'uppercase',
-                                padding: '1.25rem 0.5rem 0.25rem',
-                                letterSpacing: '0.05em',
-                                borderBottom: '1px solid rgba(129, 140, 248, 0.2)',
-                                marginBottom: '0.5rem',
-                                marginLeft: '0.25rem',
-                                marginRight: '0.25rem'
+                                padding: '1.5rem 0.75rem 0.5rem',
+                                letterSpacing: '0.12em',
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
+                                marginBottom: '0.25rem',
+                                transition: 'color 0.3s'
                             }}>
                                 {item.section}
                             </div>
@@ -191,24 +190,25 @@ export default function Sidebar({ menuItems, activeTab, setActiveTab, isOpen, ex
             </nav>
 
             {canScrollDown && (
-                <div className="animate-bounce" style={{
+                <div className="animate-float-slow" style={{
                     position: 'absolute',
                     bottom: '5.5rem',
                     left: '50%',
                     transform: 'translateX(-50%)',
                     zIndex: 20,
                     pointerEvents: 'none',
-                    color: '#fff',
-                    background: 'var(--accent-primary)',
+                    background: 'rgba(15, 23, 42, 0.6)',
+                    backdropFilter: 'blur(4px)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
                     borderRadius: '50%',
-                    padding: '6px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                    padding: '8px',
+                    color: 'var(--text-secondary)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: 0.9
+                    justifyContent: 'center'
                 }}>
-                    <ChevronDown size={20} />
+                    <ChevronDown size={16} />
                 </div>
             )}
 

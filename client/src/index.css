@@ -235,20 +235,22 @@ button {
   }
 }
 
-@keyframes bounce {
+@keyframes float-slow {
 
   0%,
   100% {
     transform: translateY(0);
+    opacity: 0.5;
   }
 
   50% {
-    transform: translateY(5px);
+    transform: translateY(6px);
+    opacity: 1;
   }
 }
 
-.animate-bounce {
-  animation: bounce 1s infinite;
+.animate-float-slow {
+  animation: float-slow 3s ease-in-out infinite;
 }
 
 /* Layouts */
