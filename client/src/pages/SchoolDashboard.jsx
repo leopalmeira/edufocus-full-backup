@@ -58,7 +58,8 @@ export default function SchoolDashboard() {
     const [showMetricsModal, setShowMetricsModal] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [cameras, setCameras] = useState([]);
-    const [currentTime, setCurrentTime] = useState(new Date()); // Relógio em tempo real
+    const [currentTime, setCurrentTime] = useState(new Date());
+    const [upcomingEvents, setUpcomingEvents] = useState([]); // Eventos reais
 
     // Camera Form States
     const [showCameraForm, setShowCameraForm] = useState(false);
@@ -186,10 +187,28 @@ export default function SchoolDashboard() {
 
     const loadEmployees = async () => {
         try {
-            const res = await api.get('/school/employees');
-            setEmployees(res.data || []);
-        } catch (err) {
-            console.error('Erro ao carregar funcionários:', err);
+            const res = await api.get(`/school/employees`);
+            setEmployees(res.data);
+        } catch (error) {
+            console.error('Erro ao carregar funcionários:', error);
+        }
+    };
+
+    const loadEvents = async () => {
+        try {
+            const res = await api.get('/school/events');
+            // Filtrar eventos futuros e ordenar por data
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const future = res.data.filter(e => new Date(e.event_date) >= today);
+            future.sort((a, b) => new Date(a.event_date) - new Date(b.event_date));
+
+            setUpcomingEvents(future);
+        } catch (error) {
+            console.error('Erro ao carregar eventos:', error);
+            // Fallback silencioso (não quebrar o dash se falhar)
+            setUpcomingEvents([]);
         }
     };
 
@@ -411,6 +430,7 @@ export default function SchoolDashboard() {
             loadStudents();
             loadCameras();
             loadEmployees();
+            loadEvents();
         }
         if (activeTab === 'teachers') {
             loadTeachers();
@@ -907,34 +927,39 @@ export default function SchoolDashboard() {
                             </div>
 
                             {/* Widget de Próximos Eventos */}
-                            <div style={{ padding: '2rem', borderRadius: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
-                                <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <Calendar size={20} /> Próximos Eventos
+                            <div style={{ padding: '2rem', borderRadius: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+                                <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
+                                    <Calendar size={20} className="text-accent-primary" /> Próximos Eventos
                                 </h4>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    <div style={{ display: 'flex', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', alignItems: 'center' }}>
-                                        <div style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', minWidth: '50px' }}>
-                                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>HOJE</div>
-                                            <div style={{ fontSize: '1.25rem', fontWeight: '800' }}>{currentTime.getDate()}</div>
+
+                                <div style={{ flex: 1 }}>
+                                    {upcomingEvents.length > 0 ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                            {upcomingEvents.slice(0, 3).map(event => (
+                                                <div key={event.id} style={{ display: 'flex', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', alignItems: 'center', transition: 'background 0.2s', cursor: 'pointer' }} onClick={() => setActiveTab('events')} className="hover:bg-white/5">
+                                                    <div style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', minWidth: '50px' }}>
+                                                        <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{new Date(event.event_date).getDate()}</div>
+                                                        <div style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>{new Date(event.event_date).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}</div>
+                                                    </div>
+                                                    <div>
+                                                        <h5 style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{event.title}</h5>
+                                                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{event.description || 'Ver detalhes...'}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <button className="btn" style={{ width: '100%', marginTop: '0.5rem', background: 'rgba(255,255,255,0.05)' }} onClick={() => setActiveTab('events')}>
+                                                Ver Calendário Completo
+                                            </button>
                                         </div>
-                                        <div>
-                                            <h5 style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Reunião Pedagógica</h5>
-                                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>14:00 - Sala dos Professores</p>
+                                    ) : (
+                                        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', gap: '1rem', opacity: 0.5, minHeight: '150px' }}>
+                                            <Calendar size={48} />
+                                            <p>Nenhum evento próximo</p>
+                                            <button className="btn" style={{ background: 'var(--bg-secondary)', fontSize: '0.8rem', border: '1px solid var(--border-color)' }} onClick={() => setActiveTab('events')}>
+                                                + Criar Evento
+                                            </button>
                                         </div>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', alignItems: 'center' }}>
-                                        <div style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', minWidth: '50px' }}>
-                                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>AMANHÃ</div>
-                                            <div style={{ fontSize: '1.25rem', fontWeight: '800' }}>{currentTime.getDate() + 1}</div>
-                                        </div>
-                                        <div>
-                                            <h5 style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Entrega de Boletins</h5>
-                                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Dia todo - Secretaria</p>
-                                        </div>
-                                    </div>
-                                    <button className="btn" style={{ width: '100%', marginTop: '0.5rem', background: 'rgba(255,255,255,0.05)' }} onClick={() => setActiveTab('events')}>
-                                        Ver Calendário Completo
-                                    </button>
+                                    )}
                                 </div>
                             </div>
 
