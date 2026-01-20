@@ -58,6 +58,7 @@ export default function SchoolDashboard() {
     const [showMetricsModal, setShowMetricsModal] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [cameras, setCameras] = useState([]);
+    const [currentTime, setCurrentTime] = useState(new Date()); // Relógio em tempo real
 
     // Camera Form States
     const [showCameraForm, setShowCameraForm] = useState(false);
@@ -131,6 +132,17 @@ export default function SchoolDashboard() {
     const [teacherForModal, setTeacherForModal] = useState(null);
     const [selectedClass, setSelectedClass] = useState(null);
     const [showClassModal, setShowClassModal] = useState(false);
+
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const loadTourStatus = () => {
+        // This function was likely intended for tour status loading, but the provided content was a copy of loadModels.
+        // Keeping it as an empty placeholder or removing it if not needed.
+        // For now, it's an empty function to avoid syntax errors from the provided snippet.
+    };
 
     useEffect(() => {
         const loadModels = async () => {
@@ -727,106 +739,202 @@ export default function SchoolDashboard() {
             <div className="main-content">
                 {activeTab === 'dashboard' && (
                     <div className="fade-in" style={{ paddingBottom: '3rem' }}>
-                        {/* Header Minimalista */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                        {/* Header com Data e Hora */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', marginBottom: '2rem' }}>
                             <div>
-                                <h2 style={{ fontSize: '1.8rem', fontWeight: '700', color: 'var(--text-primary)' }}>Visão Geral</h2>
-                                <p style={{ color: 'var(--text-secondary)' }}>Resumo em tempo real da sua escola</p>
+                                <h2 style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Visão Geral</h2>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Resumo em tempo real da sua escola</p>
                             </div>
-                            <button
-                                className="btn"
-                                onClick={openEditSchoolModal}
-                                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', gap: '0.5rem', alignItems: 'center' }}
-                            >
-                                <Edit size={16} /> Configurações
-                            </button>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--accent-primary)', fontFamily: 'monospace' }}>
+                                    {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                                    {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Métricas Principais - Estilo "Python Dashboard" */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+                        {/* Métricas Principais (KPIS) - Clicáveis */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
 
                             {/* Card Alunos */}
-                            <div style={{ position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                            <div
+                                onClick={() => setActiveTab('students')}
+                                style={{
+                                    position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px',
+                                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)',
+                                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                                    cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s'
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(59, 130, 246, 0.4)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                            >
                                 <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.1, color: '#3b82f6' }}>
                                     <Users size={100} />
                                 </div>
-                                <h3 style={{ fontSize: '3.5rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#3b82f6' }}>{students.length}</h3>
-                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem' }}>Total de Alunos</p>
+                                <h3 style={{ fontSize: '3rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#3b82f6' }}>{students.length}</h3>
+                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    Total de Alunos <ArrowRight size={14} />
+                                </p>
                             </div>
 
                             {/* Card Professores */}
-                            <div style={{ position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                            <div
+                                onClick={() => setActiveTab('teachers')}
+                                style={{
+                                    position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px',
+                                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)',
+                                    border: '1px solid rgba(139, 92, 246, 0.2)',
+                                    cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s'
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(139, 92, 246, 0.4)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                            >
                                 <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.1, color: '#8b5cf6' }}>
                                     <GraduationCap size={100} />
                                 </div>
-                                <h3 style={{ fontSize: '3.5rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#8b5cf6' }}>{teachers.length}</h3>
-                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem' }}>Professores Ativos</p>
+                                <h3 style={{ fontSize: '3rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#8b5cf6' }}>{teachers.length}</h3>
+                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    Professores <ArrowRight size={14} />
+                                </p>
                             </div>
 
                             {/* Card Turmas */}
-                            <div style={{ position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                            <div
+                                onClick={() => setActiveTab('classes')}
+                                style={{
+                                    position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px',
+                                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)',
+                                    border: '1px solid rgba(245, 158, 11, 0.2)',
+                                    cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s'
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(245, 158, 11, 0.4)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                            >
                                 <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.1, color: '#f59e0b' }}>
                                     <Users size={100} />
                                 </div>
-                                <h3 style={{ fontSize: '3.5rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#f59e0b' }}>{classes.length}</h3>
-                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem' }}>Turmas Cadastradas</p>
-                            </div>
-
-
-                            {/* Card Funcionários */}
-                            <div style={{ position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)', border: '1px solid rgba(236, 72, 153, 0.2)' }}>
-                                <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.1, color: '#ec4899' }}>
-                                    <Users size={100} />
-                                </div>
-                                <h3 style={{ fontSize: '3.5rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#ec4899' }}>{employees.length}</h3>
-                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem' }}>Funcionários</p>
+                                <h3 style={{ fontSize: '3rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#f59e0b' }}>{classes.length}</h3>
+                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    Turmas <ArrowRight size={14} />
+                                </p>
                             </div>
 
                             {/* Card Câmeras */}
-                            <div style={{ position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                            <div
+                                onClick={() => setActiveTab('cameras')}
+                                style={{
+                                    position: 'relative', overflow: 'hidden', padding: '1.5rem', borderRadius: '16px',
+                                    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(30, 30, 40, 0.4) 100%)',
+                                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                                    cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s'
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(16, 185, 129, 0.4)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                            >
                                 <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.1, color: '#10b981' }}>
                                     <Camera size={100} />
                                 </div>
-                                <h3 style={{ fontSize: '3.5rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#10b981' }}>{cameras?.length || 0}</h3>
-                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem' }}>Câmeras Online</p>
+                                <h3 style={{ fontSize: '3rem', fontWeight: '800', margin: 0, lineHeight: 1, color: '#10b981' }}>{cameras?.length || 0}</h3>
+                                <p style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px', fontWeight: '600', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    Câmeras Online <ArrowRight size={14} />
+                                </p>
                             </div>
                         </div>
 
                         {/* Seção Gráficos e Detalhes */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
 
-                            {/* Gráfico Fake de Barras: Alunos por Turma */}
-                            <div style={{ padding: '1.5rem', borderRadius: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
-                                <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <BarChart3 size={18} /> Distribuição de Alunos por Turma
+                            {/* Gráfico Melhorado */}
+                            <div style={{ padding: '2rem', borderRadius: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+                                <h4 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
+                                    <BarChart3 size={20} className="text-accent-primary" /> Distribuição de Alunos por Turma
                                 </h4>
-                                <div style={{ display: 'flex', alignItems: 'flex-end', height: '200px', gap: '12px', paddingBottom: '5px' }}>
-                                    {/* Lógica para gerar barras dinamicamente */}
-                                    {Object.entries(students.reduce((acc, s) => {
+
+                                <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', height: '240px', gap: '20px', paddingBottom: '10px' }}>
+                                    {students.length > 0 ? Object.entries(students.reduce((acc, s) => {
                                         const cls = s.class_name || 'S/ Turma';
                                         acc[cls] = (acc[cls] || 0) + 1;
                                         return acc;
-                                    }, {})).slice(0, 10).map(([cls, count], i, arr) => {
+                                    }, {})).slice(0, 8).map(([cls, count], i, arr) => {
                                         const max = Math.max(...arr.map(a => a[1])) || 1;
                                         const height = (count / max) * 100;
                                         return (
-                                            <div key={cls} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
-                                                <div className="tooltip-container" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                                            <div key={cls} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', height: '100%' }}>
+
+                                                {/* Barra */}
+                                                <div className="tooltip-container" style={{ width: '40px', height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                                                     <div style={{
                                                         width: '100%',
                                                         height: `${height}%`,
-                                                        background: `hsl(${210 + (i * 15)}, 70%, 60%)`,
-                                                        borderRadius: '4px 4px 0 0',
-                                                        opacity: 0.8,
-                                                        transition: 'height 0.5s ease'
-                                                    }} />
-                                                    <span className="tooltip">{count} alunos</span>
+                                                        background: `linear-gradient(to top, hsl(${210 + (i * 20)}, 70%, 50%), hsl(${210 + (i * 20)}, 70%, 65%))`,
+                                                        borderRadius: '8px 8px 0 0',
+                                                        opacity: 0.9,
+                                                        transition: 'height 1s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                        position: 'relative',
+                                                        minHeight: '4px'
+                                                    }}>
+
+                                                    </div>
+                                                    <span className="tooltip" style={{ bottom: '100%', marginBottom: '5px' }}>{count} alunos</span>
+                                                    {/* Contador acima da barra */}
+                                                    <span style={{ position: 'absolute', bottom: `${height + 5}%`, fontSize: '0.85rem', fontWeight: '700', color: 'white' }}>{count}</span>
                                                 </div>
-                                                <span style={{ fontSize: '10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{cls}</span>
+
+                                                {/* Label da Turma */}
+                                                <span style={{
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: '600',
+                                                    color: 'var(--text-secondary)',
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    maxWidth: '100%',
+                                                    marginTop: '0.5rem'
+                                                }}>
+                                                    {cls}
+                                                </span>
                                             </div>
                                         );
-                                    })}
-                                    {students.length === 0 && <p style={{ width: '100%', textAlign: 'center', color: 'var(--text-secondary)' }}>Sem dados para exibir</p>}
+                                    }) : (
+                                        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', gap: '1rem', opacity: 0.5 }}>
+                                            <BarChart3 size={48} />
+                                            <p>Ainda não há dados de alunos</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Widget de Próximos Eventos */}
+                            <div style={{ padding: '2rem', borderRadius: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+                                <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Calendar size={20} /> Próximos Eventos
+                                </h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div style={{ display: 'flex', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', alignItems: 'center' }}>
+                                        <div style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', minWidth: '50px' }}>
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>HOJE</div>
+                                            <div style={{ fontSize: '1.25rem', fontWeight: '800' }}>{currentTime.getDate()}</div>
+                                        </div>
+                                        <div>
+                                            <h5 style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Reunião Pedagógica</h5>
+                                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>14:00 - Sala dos Professores</p>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', alignItems: 'center' }}>
+                                        <div style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', minWidth: '50px' }}>
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>AMANHÃ</div>
+                                            <div style={{ fontSize: '1.25rem', fontWeight: '800' }}>{currentTime.getDate() + 1}</div>
+                                        </div>
+                                        <div>
+                                            <h5 style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Entrega de Boletins</h5>
+                                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Dia todo - Secretaria</p>
+                                        </div>
+                                    </div>
+                                    <button className="btn" style={{ width: '100%', marginTop: '0.5rem', background: 'rgba(255,255,255,0.05)' }} onClick={() => setActiveTab('events')}>
+                                        Ver Calendário Completo
+                                    </button>
                                 </div>
                             </div>
 
