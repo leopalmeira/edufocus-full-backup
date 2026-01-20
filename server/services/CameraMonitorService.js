@@ -1,8 +1,8 @@
-const db = require('better-sqlite3')('../database/system.db');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const Database = require('better-sqlite3');
 
 // Tentar carregar dependências de IA (Opcionais para local, Obrigatórias para Produção)
 let faceapi, canvas, ffmpegPath;
@@ -19,7 +19,6 @@ try {
     console.log('✅ [CAMERA MONITOR] Módulo de IA Carregado com Sucesso (Modo SERVIDOR)');
 } catch (e) {
     console.warn('⚠️ [CAMERA MONITOR] Dependências de IA não encontradas. Monitoramento rodará apenas check de conexão.');
-    console.warn('   (Isso é normal em ambiente de desenvolvimento Windows sem compiladores C++)');
 }
 
 class CameraMonitorService {
@@ -27,11 +26,31 @@ class CameraMonitorService {
         this.activeStreams = new Map(); // camera_id -> { status, lastCheck }
         this.modelsLoaded = false;
         this.MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
-        this.knownFaces = new Map(); // school_id -> LabeledFaceDescriptors[]
+        this.db = null; // Banco de dados será inicializado no start()
     }
 
     async start() {
         console.log('\n🎥 [CAMERA MONITOR] Iniciando Serviço...');
+
+        // Inicializar Banco de Dados System com Caminho Absoluto Seguro
+        try {
+            // __dirname = server/services
+            // Queremos: server/services/../../database -> raiz/database
+            const dbDir = path.resolve(__dirname, '../../database');
+
+            if (!fs.existsSync(dbDir)) {
+                console.log('📁 [CAMERA MONITOR] Criando diretório de banco de dados:', dbDir);
+                fs.mkdirSync(dbDir, { recursive: true });
+            }
+
+            const dbPath = path.join(dbDir, 'system.db');
+            this.db = new Database(dbPath);
+            console.log('✅ [CAMERA MONITOR] Conectado ao banco de dados:', dbPath);
+
+        } catch (e) {
+            console.error('❌ [CAMERA MONITOR] Erro fatal ao abrir banco de dados:', e.message);
+            return;
+        }
 
         if (AI_AVAILABLE) {
             await this.loadModels();
@@ -45,24 +64,27 @@ class CameraMonitorService {
     async loadModels() {
         try {
             console.log('🔄 [CAMERA MONITOR] Carregando modelos de Face API...');
-            // Carregar modelos do disco se existirem, ou baixar? 
-            // O face-api node exige carregar do disco.
-            // Vou usar loadFromDisk se tiver a pasta, senão erro.
-            // Hack: No Render, não temos como garantir download prévio fácil.
-            // Vou tentar carregar direto dos pesos em memória usando fetch se possível, mas o API padrão é loadFromDisk.
 
-            // Solução para Render: Usar models pré-baixados ou baixar na hora em /tmp
-            const modelPath = path.join(__dirname, '../models');
+            // Define o diretório de modelos (raiz/server/models)
+            const modelPath = path.resolve(__dirname, '../models');
+
             if (!fs.existsSync(modelPath)) {
                 fs.mkdirSync(modelPath, { recursive: true });
-                console.log('⬇️ [CAMERA MONITOR] Baixando modelos para ' + modelPath);
-                await this.downloadModel(this.MODEL_URL + 'ssd_mobilenet_v1_model-weights_manifest.json', modelPath);
-                await this.downloadModel(this.MODEL_URL + 'ssd_mobilenet_v1_model-shard1', modelPath);
-                await this.downloadModel(this.MODEL_URL + 'force_landmark_68_model-weights_manifest.json', modelPath);
-                await this.downloadModel(this.MODEL_URL + 'face_landmark_68_model-shard1', modelPath);
-                await this.downloadModel(this.MODEL_URL + 'face_recognition_model-weights_manifest.json', modelPath);
-                await this.downloadModel(this.MODEL_URL + 'face_recognition_model-shard1', modelPath);
-                await this.downloadModel(this.MODEL_URL + 'face_recognition_model-shard2', modelPath);
+                console.log('⬇️ [CAMERA MONITOR] Baixando modelos para', modelPath);
+
+                const models = [
+                    'ssd_mobilenet_v1_model-weights_manifest.json',
+                    'ssd_mobilenet_v1_model-shard1',
+                    'face_landmark_68_model-weights_manifest.json',
+                    'face_landmark_68_model-shard1',
+                    'face_recognition_model-weights_manifest.json',
+                    'face_recognition_model-shard1',
+                    'face_recognition_model-shard2'
+                ];
+
+                for (const model of models) {
+                    await this.downloadModel(this.MODEL_URL + model, modelPath);
+                }
             }
 
             await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelPath);
@@ -72,7 +94,7 @@ class CameraMonitorService {
             this.modelsLoaded = true;
             console.log('✅ [CAMERA MONITOR] Modelos carregados!');
         } catch (err) {
-            console.error('❌ [CAMERA MONITOR] Erro ao carregar modelos:', err);
+            console.error('❌ [CAMERA MONITOR] Erro ao carregar modelos:', err.message);
             AI_AVAILABLE = false; // Desativa IA se falhar
         }
     }
@@ -82,19 +104,25 @@ class CameraMonitorService {
         const filePath = path.join(destFolder, fileName);
         if (fs.existsSync(filePath)) return;
 
-        const writer = fs.createWriteStream(filePath);
-        const response = await axios({ url, method: 'GET', responseType: 'stream' });
-        response.data.pipe(writer);
-        return new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-        });
+        try {
+            const writer = fs.createWriteStream(filePath);
+            const response = await axios({ url, method: 'GET', responseType: 'stream' });
+            response.data.pipe(writer);
+            return new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+        } catch (error) {
+            console.error(`❌ Falha ao baixar ${fileName}:`, error.message);
+        }
     }
 
     refreshCameras() {
+        if (!this.db) return;
+
         try {
             // Pegar todas as câmeras ativas de portaria
-            const cameras = db.prepare(`
+            const cameras = this.db.prepare(`
                 SELECT * FROM cameras 
                 WHERE status = 'active' 
                 AND (camera_purpose = 'entrance' OR camera_purpose = 'presence')
@@ -106,7 +134,7 @@ class CameraMonitorService {
                 this.processCamera(cam);
             });
         } catch (err) {
-            console.error('❌ [CONFIG] Erro ao listar câmeras:', err.message);
+            console.error('❌ [Config] Erro ao listar câmeras:', err.message);
         }
     }
 
@@ -157,37 +185,42 @@ class CameraMonitorService {
                 if (code === 0 && buffer.length > 0) {
                     resolve(buffer);
                 } else {
-                    // Timeout ou erro silencioso
                     resolve(null);
                 }
             });
 
             ffmpeg.stderr.on('data', () => { }); // Ignorar logs do ffmpeg
 
-            // Timeout de 5s para não travar
+            // Timeout de 10s
             setTimeout(() => {
-                ffmpeg.kill();
+                try { ffmpeg.kill(); } catch (e) { }
                 resolve(null);
-            }, 5000);
+            }, 10000);
         });
     }
 
     async recognizeFaces(detections, schoolId) {
-        // 1. Carregar alunos conhecidos dessa escola (Cachear se possível)
-        // Por simplicidade, vou buscar do banco SQLite de escola específico?
-        // O sistema usa banco por escola 'school_X.db'. Preciso abrir conexão dinâmica.
+        // Usa caminho absoluto para evitar erro de diretório
+        const dbDir = path.resolve(__dirname, '../../database');
+        const schoolDbPath = path.join(dbDir, `school_${schoolId}.db`);
 
-        // Mock rápido: Se não tiver banco carregado, pular.
-        // Implementar conexão dinâmica com 'better-sqlite3' igual no server.js
-        const schoolDbPath = `../database/school_${schoolId}.db`;
         if (!fs.existsSync(schoolDbPath)) return;
 
-        const schoolDb = require('better-sqlite3')(schoolDbPath);
+        let schoolDb;
+        try {
+            schoolDb = new Database(schoolDbPath);
+        } catch (e) {
+            console.error('Erro ao abrir DB escola:', e);
+            return;
+        }
 
         // Buscar alunos com face_descriptor
         const students = schoolDb.prepare("SELECT id, name, face_descriptor FROM students WHERE face_descriptor IS NOT NULL").all();
 
-        if (students.length === 0) return;
+        if (students.length === 0) {
+            schoolDb.close();
+            return;
+        }
 
         // Criar Matcher
         const labeledDescriptors = students.map(s => {
@@ -197,7 +230,10 @@ class CameraMonitorService {
             } catch (e) { return null; }
         }).filter(d => d);
 
-        if (labeledDescriptors.length === 0) return;
+        if (labeledDescriptors.length === 0) {
+            schoolDb.close();
+            return;
+        }
 
         const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
 
@@ -226,14 +262,12 @@ class CameraMonitorService {
 
             console.log(`📝 Presença registrada para ${student.name}`);
 
-            // Criar Notificação (Tabela notifications no DB da escola para o App consumir)
-            // Assumindo tabela 'notifications' (student_id, title, message, read, created_at)
+            // Criar Notificação
             try {
                 db.prepare("INSERT INTO notifications (student_id, title, message, read, created_at) VALUES (?, ?, ?, 0, datetime('now'))")
                     .run(student.id, 'Chegada na Escola', `O aluno ${student.name} chegou na escola.`, new Date().toISOString());
             } catch (e) {
-                // Tabela pode não existir ou estrutura diferente. 
-                // Fallback para system.db se for centralizado? Não, notificações são por escola.
+                // Ignore se tabela não existir (migração pendente)
             }
         }
     }
