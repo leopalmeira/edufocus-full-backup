@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, GraduationCap, ClipboardCheck, HelpCircle, FileText, BarChart3, MessageCircle, Menu, Camera, Clock, Calendar, Building2, Edit, Save, X, DollarSign, LogOut } from 'lucide-react';
+import { Users, GraduationCap, ClipboardCheck, HelpCircle, FileText, BarChart3, MessageCircle, Menu, Camera, Clock, Calendar, Building2, Edit, Save, X, DollarSign, LogOut, Plus, CheckCircle, XCircle, Target, Info, DoorOpen } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import WhatsAppPanel from '../components/WhatsAppPanel'; // Manter caso queira voltar
 import SchoolCommunicationPanel from '../components/SchoolCommunicationPanel';
@@ -58,6 +58,25 @@ export default function SchoolDashboard() {
     const [showMetricsModal, setShowMetricsModal] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [cameras, setCameras] = useState([]);
+
+    // Camera Form States
+    const [showCameraForm, setShowCameraForm] = useState(false);
+    const [testing, setTesting] = useState(false);
+    const [testResult, setTestResult] = useState(null);
+    const [cameraForm, setCameraForm] = useState({
+        // school_id será injetado no submit
+        classroom_id: '',
+        assigned_classes: [],
+        camera_name: '',
+        camera_type: 'IP',
+        camera_purpose: 'classroom',
+        camera_ip: '',
+        camera_url: '',
+        camera_port: '80',
+        camera_username: '',
+        camera_password: '',
+        notes: ''
+    });
 
     // School Edit State
     const [isEditSchoolModalOpen, setIsEditSchoolModalOpen] = useState(false);
@@ -168,6 +187,57 @@ export default function SchoolDashboard() {
             setCameras(res.data || []);
         } catch (err) {
             console.error('Erro ao carregar câmeras:', err);
+        }
+    };
+
+    const testConnection = async () => {
+        if (!cameraForm.camera_url) {
+            alert('⚠️ Preencha a URL da câmera primeiro');
+            return;
+        }
+        setTesting(true);
+        setTestResult(null);
+        try {
+            const res = await api.post('/technician/cameras/test', {
+                camera_url: cameraForm.camera_url,
+                camera_type: cameraForm.camera_type
+            });
+            setTestResult({ success: true, message: res.data.message });
+        } catch (err) {
+            setTestResult({ success: false, message: err.response?.data?.message || 'Erro ao testar conexão' });
+        } finally {
+            setTesting(false);
+        }
+    };
+
+    const handleAddCamera = async (e) => {
+        e.preventDefault();
+        try {
+            // Usar endpoint de técnico (funciona se autenticado) ou um específico de escola
+            // Importante: schoolId vem do contexto (linha 32)
+            const payload = { ...cameraForm, school_id: schoolId };
+
+            await api.post('/technician/cameras', payload);
+
+            alert('✅ Câmera adicionada com sucesso! O monitoramento será iniciado automaticamente pelo servidor.');
+            setShowCameraForm(false);
+            setCameraForm({
+                classroom_id: '',
+                assigned_classes: [],
+                camera_name: '',
+                camera_type: 'IP',
+                camera_purpose: 'classroom',
+                camera_ip: '',
+                camera_url: '',
+                camera_port: '80',
+                camera_username: '',
+                camera_password: '',
+                notes: ''
+            });
+            loadCameras();
+        } catch (err) {
+            console.error(err);
+            alert('Erro ao adicionar câmera: ' + (err.response?.data?.message || err.message));
         }
     };
 
@@ -1199,50 +1269,146 @@ export default function SchoolDashboard() {
 
                 {activeTab === 'cameras' && (
                     <div className="fade-in">
-                        <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '2rem' }}>📹 Câmeras Instaladas</h1>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                            <div>
+                                <h1 style={{ fontSize: '2rem', fontWeight: '700', margin: 0 }}>📹 Câmeras de Monitoramento</h1>
+                                <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                                    Gerencie as câmeras de segurança e reconhecimento facial da escola.
+                                    <br />
+                                    <span style={{ fontSize: '0.85em', color: '#10b981' }}>✅ O monitoramento é processado pelo servidor e continua ativo mesmo com este painel fechado.</span>
+                                </p>
+                            </div>
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => {
+                                    setShowCameraForm(!showCameraForm);
+                                    if (!showCameraForm) {
+                                        // Carrega turmas para o select se for abrir
+                                        api.get('/school/classes').then(res => setClasses(res.data)).catch(console.error);
+                                    }
+                                }}
+                            >
+                                {showCameraForm ? <X size={20} /> : <Plus size={20} />}
+                                {showCameraForm ? 'Cancelar' : 'Nova Câmera'}
+                            </button>
+                        </div>
+
+                        {showCameraForm && (
+                            <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
+                                <form onSubmit={handleAddCamera}>
+                                    <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1.5rem' }}>Cadastrar Nova Câmera</h3>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Finalidade *</label>
+                                            <select
+                                                className="input-field"
+                                                value={cameraForm.camera_purpose}
+                                                onChange={(e) => setCameraForm({ ...cameraForm, camera_purpose: e.target.value })}
+                                                required
+                                            >
+                                                <option value="entrance">🚪 Entrada (Reconhecimento Facial - Alunos)</option>
+                                                <option value="classroom">📚 Sala de Aula (Monitoramento)</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Nome da Câmera *</label>
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                placeholder="Ex: Câmera Portaria, Sala 101..."
+                                                value={cameraForm.camera_name}
+                                                onChange={(e) => setCameraForm({ ...cameraForm, camera_name: e.target.value })}
+                                                required
+                                            />
+                                        </div>
+
+                                        {cameraForm.camera_purpose === 'classroom' && (
+                                            <div style={{ gridColumn: '1 / -1' }}>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Vincular à Turma (Opcional)</label>
+                                                <select
+                                                    className="input-field"
+                                                    value={cameraForm.assigned_classes[0] || ''}
+                                                    onChange={(e) => setCameraForm({ ...cameraForm, assigned_classes: e.target.value ? [e.target.value] : [] })}
+                                                >
+                                                    <option value="">-- Nenhuma (Apenas Corredor/Pátio) --</option>
+                                                    {classes.map(cls => (
+                                                        <option key={cls.id} value={cls.id}>{cls.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+
+                                        <div style={{ gridColumn: '1 / -1' }}>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>URL da Câmera (RTSP/HTTP) *</label>
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                placeholder="rtsp://admin:senha@192.168.1.100:554/stream"
+                                                value={cameraForm.camera_url}
+                                                onChange={(e) => setCameraForm({ ...cameraForm, camera_url: e.target.value })}
+                                                required
+                                            />
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                                Esta URL deve ser acessível pelo servidor.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {testResult && (
+                                        <div style={{ padding: '1rem', marginBottom: '1rem', borderRadius: '8px', background: testResult.success ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: testResult.success ? '#10b981' : '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            {testResult.success ? <CheckCircle size={18} /> : <XCircle size={18} />}
+                                            {testResult.message}
+                                        </div>
+                                    )}
+
+                                    <div style={{ display: 'flex', gap: '1rem' }}>
+                                        <button type="button" className="btn" style={{ background: 'var(--bg-secondary)' }} onClick={testConnection} disabled={testing}>
+                                            {testing ? 'Testando...' : '🔍 Testar Conexão'}
+                                        </button>
+                                        <button type="submit" className="btn btn-primary">💾 Salvar Câmera</button>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             {cameras.map(camera => (
-                                <div key={camera.id} className="glass-panel" style={{ padding: '1.5rem' }}>
+                                <div key={camera.id} className="glass-panel" style={{ padding: '1.5rem', borderLeft: camera.status === 'active' ? '4px solid #10b981' : '4px solid #ef4444' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                         <div>
                                             <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                 {camera.camera_purpose === 'entrance' ? '🚪' : '📚'} {camera.camera_name}
                                             </h3>
                                             <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                                                <div>
-                                                    <strong>Finalidade:</strong> {camera.camera_purpose === 'entrance' ? 'Entrada (Reconhecimento Facial)' : 'Sala de Aula (Monitoramento)'}
-                                                </div>
-                                                {camera.camera_purpose === 'classroom' && (
-                                                    <div><strong>Turmas:</strong> {camera.classroom_names || 'N/A'}</div>
-                                                )}
-                                                <div><strong>IP:</strong> {camera.camera_ip || 'N/A'}</div>
-                                                <div><strong>Tipo:</strong> {camera.camera_type}</div>
-                                                <div>
-                                                    <strong>Status:</strong>
-                                                    <span style={{ color: camera.status === 'active' ? '#10b981' : '#ef4444', marginLeft: '0.5rem' }}>
-                                                        {camera.status === 'active' ? '🟢 Online' : '🔴 Offline'}
+                                                <div><strong>Finalidade:</strong> {camera.camera_purpose === 'entrance' ? 'Entrada (Face ID)' : 'Monitoramento'}</div>
+                                                <div><strong>URL:</strong> {camera.camera_url}</div>
+                                                <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem' }}>
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: camera.status === 'active' ? '#10b981' : '#ef4444' }}>
+                                                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: camera.status === 'active' ? '#10b981' : '#ef4444' }} />
+                                                        {camera.status === 'active' ? 'Online' : 'Offline'}
+                                                    </span>
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#3b82f6' }}>
+                                                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} />
+                                                        Monitoramento Ativo
                                                     </span>
                                                 </div>
                                             </div>
                                         </div>
-                                        <button
-                                            className="btn"
-                                            style={{ background: 'var(--danger)', padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-                                            onClick={() => requestCameraRemoval(camera.id, camera.camera_name)}
-                                        >
-                                            📝 Solicitar Remoção
-                                        </button>
+                                        <div>
+                                            {/* Botões de Ação Futuros (Editar/Excluir) */}
+                                        </div>
                                     </div>
                                 </div>
                             ))}
 
-                            {cameras.length === 0 && (
+                            {cameras.length === 0 && !showCameraForm && (
                                 <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
                                     <Camera size={48} style={{ color: 'var(--text-secondary)', marginBottom: '1rem', opacity: 0.5 }} />
-                                    <h3 style={{ marginBottom: '0.5rem' }}>Nenhuma câmera instalada</h3>
+                                    <h3 style={{ marginBottom: '0.5rem' }}>Nenhuma câmera configurada</h3>
                                     <p style={{ color: 'var(--text-secondary)' }}>
-                                        Entre em contato com o técnico para instalar câmeras na sua escola.
+                                        Clique em "Nova Câmera" para adicionar o monitoramento.
                                     </p>
                                 </div>
                             )}
