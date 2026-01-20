@@ -6516,16 +6516,128 @@ app.get('*', (req, res) => {
 });
 */
 
-// Rota raiz para verificação de status
+// Rota raiz: Painel de Monitoramento de Câmeras (Status Page)
 app.get('/', (req, res) => {
-    res.send(`
-        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-            <h1 style="color: #4f46e5;">EduFocus API 🚀</h1>
-            <p>Status: <strong>Online</strong></p>
-            <p>Servidor rodando e pronto para receber conexões.</p>
-            <p style="color: #666; font-size: 0.8em;">Data: ${new Date().toLocaleString('pt-BR')}</p>
-        </div>
-    `);
+    try {
+        const db = getSystemDB();
+
+        // Buscar câmeras e info da escola
+        let cameras = [];
+        try {
+            cameras = db.prepare(`
+                SELECT c.camera_name, c.status as db_status, c.camera_purpose, s.name as school_name, c.id, c.camera_url
+                FROM cameras c
+                LEFT JOIN schools s ON c.school_id = s.id
+                ORDER BY c.created_at DESC
+            `).all();
+        } catch (e) {
+            console.error("Erro ao buscar câmeras para monitor:", e);
+        }
+
+        const CameraMonitorService = require('./services/CameraMonitorService');
+        const monitorStatus = CameraMonitorService.getAllStatuses();
+
+        const camerasHtml = cameras.map(cam => {
+            const isMonitored = monitorStatus[cam.id]?.status === 'connected';
+            const statusColor = isMonitored ? '#10b981' : (cam.db_status === 'active' ? '#f59e0b' : '#ef4444');
+            const statusText = isMonitored ? 'ATIVO (IA Processando)' : (cam.db_status === 'active' ? 'Cadastrado (Aguardando Conexão)' : 'Desativado');
+            const statusIcon = isMonitored ? '🟢' : (cam.db_status === 'active' ? '🟠' : '🔴');
+
+            return `
+                <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 15px; border-left: 6px solid ${statusColor}; transition: transform 0.2s;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 1.25em; color: #1f2937; display: flex; align-items: center; gap: 8px;">
+                                <span>📷</span> ${cam.camera_name}
+                            </div>
+                            <div style="color: #6b7280; margin-top: 4px; display: flex; align-items: center; gap: 6px;">
+                                <span>🏫</span> ${cam.school_name || 'Escola Não Identificada'}
+                            </div>
+                            <div style="color: #9ca3af; font-size: 0.9em; margin-top: 4px;">
+                                🎯 Finalidade: <span style="background: #e5e7eb; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em; text-transform: uppercase;">${cam.camera_purpose}</span>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: ${statusColor}; font-weight: 700; font-size: 0.95em; display: flex; align-items: center; gap: 6px; justify-content: flex-end;">
+                                ${statusIcon} ${statusText}
+                            </div>
+                            ${isMonitored ? `<div style="font-size: 0.8em; color: #10b981; margin-top: 4px;">Online desde: ${new Date(monitorStatus[cam.id].online_since).toLocaleTimeString()}</div>` : ''}
+                             <div style="font-size: 0.75em; color: #d1d5db; margin-top: 8px; font-family: monospace;">ID: ${cam.id}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head>
+                <meta charset="UTF-8">
+                <title>EduFocus Monitor</title>
+                <meta http-equiv="refresh" content="10"> <!-- Auto refresh a cada 10s -->
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f3f4f6; margin: 0; padding: 0; line-height: 1.6; }
+                    .header { background: #4f46e5; color: white; padding: 2rem 1rem; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 2rem; }
+                    .header h1 { margin: 0; font-size: 2rem; }
+                    .header p { margin: 0.5rem 0 0; opacity: 0.9; }
+                    .container { max-width: 900px; margin: 0 auto; padding: 0 1rem; }
+                    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+                    .stat-card { background: white; padding: 1.5rem; border-radius: 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+                    .stat-value { font-size: 2.5rem; font-weight: 800; line-height: 1; margin-bottom: 0.5rem; }
+                    .stat-label { font-size: 0.875rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+                    .footer { text-align: center; margin-top: 3rem; margin-bottom: 2rem; color: #9ca3af; font-size: 0.875rem; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🚀 EduFocus Monitor Server</h1>
+                    <p>Status em Tempo Real do Sistema de Visão Computacional</p>
+                </div>
+
+                <div class="container">
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-value" style="color: #4f46e5;">${cameras.length}</div>
+                            <div class="stat-label">Câmeras Cadastradas</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" style="color: #10b981;">
+                                ${Object.keys(monitorStatus).length}
+                            </div>
+                            <div class="stat-label">IA Ativa Agora</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" style="color: #f59e0b;">
+                                ${cameras.filter(c => c.db_status === 'active' && !monitorStatus[c.id]).length}
+                            </div>
+                            <div class="stat-label">Aguardando Conexão</div>
+                        </div>
+                    </div>
+
+                    ${camerasHtml || '<div style="background: white; padding: 40px; border-radius: 12px; text-align:center; color:#6b7280;">Nenhuma câmera cadastrada no sistema ainda.</div>'}
+
+                </div>
+
+                <div class="footer">
+                    Servidor Rodando • Atualizado em: ${new Date().toLocaleString('pt-BR')} <br>
+                    Desenvolvido por EduFocus AI Team
+                </div>
+            </body>
+            </html>
+        `);
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).send(`
+            <div style="padding: 50px; text-align: center; font-family: sans-serif;">
+                <h1 style="color: #ef4444;">Erro no Monitor</h1>
+                <p>Ocorreu um erro ao carregar o status do sistema.</p>
+                <code style="background: #eee; padding: 10px; border-radius: 4px;">${err.message}</code>
+            </div>
+        `);
+    }
 });
 
 const startServer = async () => {

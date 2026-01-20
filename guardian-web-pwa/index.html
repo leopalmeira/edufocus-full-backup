@@ -3078,10 +3078,18 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
                 });
                 // Servidor retorna array direto
                 const classes = await res.json();
+
+                if (!Array.isArray(classes)) {
+                    console.error("Resposta inválida do servidor (esperava array):", classes);
+                    const msg = classes.error || "Erro desconhecido ao buscar turmas";
+                    document.getElementById('classResults').innerHTML = `<div class="result-item" style="color:red">Erro: ${msg}</div>`;
+                    return;
+                }
+
                 const div = document.getElementById('classResults');
 
                 if (classes.length === 0) {
-                    div.innerHTML = '<div class="result-item">Nenhuma turma encontrada</div>';
+                    div.innerHTML = '<div class="result-item">Nenhuma turma encontrada nesta escola.</div>';
                 } else {
                     div.innerHTML = classes.map(c => `
                         <div class="result-item" onclick="selectClass('${c.name}')">
@@ -3090,7 +3098,8 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
                     `).join('');
                 }
             } catch (error) {
-                console.error('Erro:', error);
+                console.error('Erro na requisição de turmas:', error);
+                document.getElementById('classResults').innerHTML = `<div class="result-item" style="color:red">Erro de conexão. Tente novamente.</div>`;
             }
         }
 
