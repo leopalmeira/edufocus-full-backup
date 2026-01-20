@@ -4019,7 +4019,17 @@ app.post('/api/technician/cameras', authenticateToken, async (req, res) => {
         }
 
         // Para câmeras de entrada, usar classroom_id = 0 (não vinculada)
-        const firstClassroomId = purpose === 'entrance' ? 0 : (assigned_classes && assigned_classes.length > 0 ? assigned_classes[0] : classroom_id);
+        // Garante que seja número
+        let safeClassID = 0;
+        if (purpose === 'classroom') {
+            if (assigned_classes && assigned_classes.length > 0) {
+                safeClassID = parseInt(assigned_classes[0], 10) || 0;
+            } else if (classroom_id) {
+                safeClassID = parseInt(classroom_id, 10) || 0;
+            }
+        }
+
+        const safeSchoolID = parseInt(school_id, 10);
 
         const result = db.prepare(`
             INSERT INTO cameras (
@@ -4029,8 +4039,8 @@ app.post('/api/technician/cameras', authenticateToken, async (req, res) => {
                 notes, installed_by, status
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
         `).run(
-            school_id,
-            firstClassroomId,
+            safeSchoolID,
+            safeClassID,
             camera_name,
             camera_type || 'IP',
             purpose,

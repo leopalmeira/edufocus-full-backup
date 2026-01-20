@@ -192,9 +192,15 @@ export default function TechnicianDashboard() {
 
         try {
             await api.post('/technician/cameras', cameraForm);
-            alert('✅ Câmera cadastrada com sucesso!');
+            console.log('✅ [FRONTEND] Câmera cadastrada! Recarregando lista...');
+            await loadCameras(); // Esperar carregar
+
+            alert('✅ Câmera cadastrada e salva com sucesso!');
+
+            // Manter a escola selecionada para facilitar próximos cadastros
+            const currentSchoolId = cameraForm.school_id;
             setCameraForm({
-                school_id: '',
+                school_id: currentSchoolId,
                 classroom_id: '',
                 assigned_classes: [],
                 camera_name: '',
@@ -209,10 +215,11 @@ export default function TechnicianDashboard() {
             });
             setShowCameraForm(false);
             setTestResult(null);
-            loadCameras();
+
         } catch (err) {
             console.error('Erro ao cadastrar câmera:', err);
-            alert('❌ Erro ao cadastrar câmera');
+            const msg = err.response?.data?.message || 'Erro desconhecido ao salvar';
+            alert(`❌ Falha ao salvar câmera: ${msg}`);
         }
     };
 
