@@ -1,11 +1,11 @@
 {
-    "name": "EduFocus Responsáveis",
-    "short_name": "EduFocus",
-    "description": "Acompanhe seu filho em tempo real",
+    "name": "Colégio Euclides",
+    "short_name": "Euclides",
+    "description": "App oficial do Colégio Euclides da Cunha",
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#0f172a",
-    "theme_color": "#0f172a",
+    "background_color": "#EA7700",
+    "theme_color": "#911010",
     "orientation": "portrait",
     "icons": [
         {

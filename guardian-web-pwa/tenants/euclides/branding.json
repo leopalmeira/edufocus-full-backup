@@ -1,0 +1,14 @@
+{
+    "id": "euclides",
+    "appName": "Colégio Euclides",
+    "appShortName": "Euclides",
+    "description": "App oficial do Colégio Euclides da Cunha",
+    "themeColor": "#911010",
+    "backgroundColor": "#EA7700",
+    "colors": {
+        "primary": "#EA7700",
+        "primaryDark": "#911010",
+        "headerBg": "#911010"
+    },
+    "logoUrl": "https://euclides.com.br/wp-content/uploads/2021/11/Group-241.png"
+}

@@ -32,9 +32,18 @@
             --bg-card: #ffffff;
             --text-main: #1e293b;
             --text-secondary: #64748b;
+            --header-bg: #1e293b;
             --radius-md: 12px;
             --radius-lg: 20px;
             --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Tema White Label: Escola Euclides */
+        .theme-euclides {
+            --primary: #EA7700;
+            --primary-dark: #911010;
+            --header-bg: #911010;
+            --success: #FF7F29;
         }
 
         @keyframes badge-attention {
@@ -121,10 +130,8 @@
 
         /* Header Professional */
         .header {
-            background: var(--text-main);
-            /* Dark Slate */
+            background: var(--header-bg);
             padding: 24px 24px 32px;
-            /* Taller header */
             color: white;
             border-bottom-left-radius: 24px;
             border-bottom-right-radius: 24px;
@@ -4290,6 +4297,35 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
         setTimeout(startEventsSSE, 1000);
 
 
+    </script>
+
+    <!-- Branding Manager (White Label) -->
+    <script>
+        const THEMES = {
+            'euclides': {
+                className: 'theme-euclides',
+                logo: 'https://euclides.com.br/wp-content/uploads/2021/11/Group-241.png',
+                title: 'Colégio Euclides'
+            }
+        };
+
+        function applyBranding(tenantId) {
+            if (!tenantId || !THEMES[tenantId]) return;
+            const theme = THEMES[tenantId];
+            document.body.classList.add(theme.className);
+            document.title = theme.title;
+            console.log('🎨 Branding aplicado para:', tenantId);
+        }
+
+        // Detectar tenant via URL ou forçado
+        (function () {
+            let tenant = window.FORCED_TENANT;
+            if (!tenant) {
+                const params = new URLSearchParams(window.location.search);
+                tenant = params.get('school');
+            }
+            if (tenant) applyBranding(tenant);
+        })();
     </script>
 </body>
 
