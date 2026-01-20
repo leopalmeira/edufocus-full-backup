@@ -35,7 +35,7 @@ export default function Sidebar({ menuItems, activeTab, setActiveTab, isOpen, ex
                 </h2>
             </div>
 
-            <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto', paddingRight: '5px' }}>
+            <nav className="sidebar-nav">
                 {menuItems.map((item, index) => {
                     // Render Section Title
                     if (item.section) {
@@ -65,7 +65,7 @@ export default function Sidebar({ menuItems, activeTab, setActiveTab, isOpen, ex
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
                                     gap: '0.75rem',
-                                    padding: '0.875rem 1rem',
+                                    padding: '0.65rem 0.8rem',
                                     borderRadius: '8px',
                                     background: activeTab === item.id && !item.hasSubmenu
                                         ? 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover))'
@@ -115,8 +115,8 @@ export default function Sidebar({ menuItems, activeTab, setActiveTab, isOpen, ex
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 gap: '0.5rem',
-                                                padding: subItem.isMainSchool ? '0.75rem 0.75rem' : '0.5rem 0.75rem',
-                                                borderRadius: '6px',
+                                                padding: subItem.isMainSchool ? '0.65rem 0.75rem' : '0.45rem 0.75rem',
+                                                borderRadius: '8px',
                                                 background: subItem.isMainSchool
                                                     ? 'rgba(16, 185, 129, 0.15)'
                                                     : (activeTab === subItem.id ? 'rgba(59, 130, 246, 0.15)' : 'transparent'),
