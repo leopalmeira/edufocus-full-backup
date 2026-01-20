@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, GraduationCap, ClipboardCheck, HelpCircle, FileText, BarChart3, MessageCircle, Menu, Camera, Clock, Calendar, Building2, Edit, Save, X, DollarSign, LogOut, Plus, CheckCircle, XCircle, Target, Info, DoorOpen } from 'lucide-react';
+import { Users, GraduationCap, ClipboardCheck, HelpCircle, FileText, BarChart3, MessageCircle, Menu, Camera, Clock, Calendar, Building2, Edit, Save, X, DollarSign, LogOut, Plus, CheckCircle, XCircle, Target, Info, DoorOpen, ArrowRight } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import WhatsAppPanel from '../components/WhatsAppPanel'; // Manter caso queira voltar
 import SchoolCommunicationPanel from '../components/SchoolCommunicationPanel';
