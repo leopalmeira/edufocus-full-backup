@@ -268,7 +268,7 @@ export default function SchoolDashboard() {
             loadCameras();
         } catch (err) {
             console.error(err);
-            alert('Erro ao adicionar câmera: ' + (err.response?.data?.message || err.message));
+            alert(`Erro ao salvar câmera: ${err.response?.data?.message || err.message}`);
         }
     };
 

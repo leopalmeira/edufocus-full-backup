@@ -3955,6 +3955,10 @@ app.get('/api/technician/cameras', authenticateToken, (req, res) => {
 
 // Cadastrar nova câmera
 app.post('/api/technician/cameras', authenticateToken, async (req, res) => {
+    // Permitir Admin da Escola cadastrar suas próprias câmeras
+    if (!['technician', 'school_admin', 'super_admin'].includes(req.user.role)) {
+        return res.status(403).json({ message: 'Acesso negado: Apenas técnicos ou administradores podem cadastrar câmeras.' });
+    }
     const {
         school_id,
         classroom_id, // Deprecated - manter para compatibilidade
