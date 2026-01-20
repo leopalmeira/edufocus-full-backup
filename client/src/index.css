@@ -249,6 +249,9 @@ button {
   display: flex;
   flex-direction: column;
   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+  height: 100vh;
+  position: sticky;
+  top: 0;
 }
 
 .main-content {
