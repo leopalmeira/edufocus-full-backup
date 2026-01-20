@@ -6516,6 +6516,18 @@ app.get('*', (req, res) => {
 });
 */
 
+// Rota raiz para verificação de status
+app.get('/', (req, res) => {
+    res.send(`
+        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+            <h1 style="color: #4f46e5;">EduFocus API 🚀</h1>
+            <p>Status: <strong>Online</strong></p>
+            <p>Servidor rodando e pronto para receber conexões.</p>
+            <p style="color: #666; font-size: 0.8em;">Data: ${new Date().toLocaleString('pt-BR')}</p>
+        </div>
+    `);
+});
+
 const startServer = async () => {
     // 1. Run Seed if available
     if (seedFunc) {
