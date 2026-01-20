@@ -267,8 +267,8 @@ export default function SchoolDashboard() {
 
     // Build menu items with dynamic affiliates submenu
     const menuItems = [
+        { section: 'Gestão Acadêmica' },
         { id: 'dashboard', label: 'Visão Geral', icon: <BarChart3 size={20} /> },
-        { id: 'teachers', label: 'Professores', icon: <GraduationCap size={20} /> },
         { id: 'classes', label: 'Turmas', icon: <Users size={20} /> },
         {
             id: 'students',
@@ -280,8 +280,12 @@ export default function SchoolDashboard() {
                 { id: 'reports', label: 'Frequência Escolar' }
             ]
         },
-        { id: 'cameras', label: 'Câmeras', icon: <Camera size={20} /> },
-        { id: 'attendance', label: 'Presença', icon: <ClipboardCheck size={20} /> },
+        { id: 'teachers', label: 'Professores', icon: <GraduationCap size={20} /> },
+
+        { section: 'Operacional' },
+        { id: 'cameras', label: 'Monitoramento (Câmeras)', icon: <Camera size={20} /> },
+        { id: 'attendance', label: 'Presença (Painel)', icon: <ClipboardCheck size={20} /> },
+        { id: 'pickups', label: 'Portaria (Saídas)', icon: <Clock size={20} /> },
         {
             id: 'employees',
             label: 'Funcionários',
@@ -293,17 +297,20 @@ export default function SchoolDashboard() {
                 { id: 'employee-report', label: 'Frequência Funcionários' }
             ]
         },
-        { id: 'events', label: 'Eventos', icon: <Calendar size={20} /> },
+
+        { section: 'Comunicação' },
         { id: 'messages', label: 'Mensagens', icon: <MessageCircle size={20} /> },
+        { id: 'events', label: 'Eventos', icon: <Calendar size={20} /> },
+
+        { section: 'Administrativo' },
         { id: 'financial', label: 'Financeiro (Pais)', icon: <DollarSign size={20} /> },
         { id: 'saas-billing', label: 'Assinatura', icon: <FileText size={20} /> },
         {
             id: 'affiliates',
-            label: 'Filiais',
+            label: 'Rede de Ensino',
             icon: <Building2 size={20} />,
             hasSubmenu: true,
             submenu: [
-                // First item: Return to main school
                 {
                     id: `school-${schoolId}`,
                     label: user?.name || 'Minha Escola',
@@ -320,9 +327,10 @@ export default function SchoolDashboard() {
                 }))
             ]
         },
+
+        { section: 'Ajuda' },
         { id: 'support', label: 'Suporte', icon: <HelpCircle size={20} /> },
         { id: 'faq', label: 'FAQ', icon: <FileText size={20} /> },
-        { id: 'pickups', label: 'Portaria (Geral)', icon: <Clock size={20} /> }
     ];
 
     const openEditSchoolModal = async () => {
