@@ -5261,6 +5261,23 @@ app.post('/api/guardian/link-student', authenticateGuardian, async (req, res) =>
     try {
         // Buscar aluno no banco da escola para confirmar existência
         const schoolDB = getSchoolDB(finalSchoolId);
+
+        // GARANTIR QUE A TABELA EXISTE
+        try {
+            schoolDB.prepare(`
+                CREATE TABLE IF NOT EXISTS student_guardians (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    student_id INTEGER NOT NULL,
+                    guardian_id INTEGER NOT NULL,
+                    relationship TEXT DEFAULT 'Responsável',
+                    status TEXT DEFAULT 'active',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(student_id, guardian_id)
+                )
+            `).run();
+        } catch (tableError) {
+            console.error('Erro ao criar tabela student_guardians:', tableError);
+        }
         const student = schoolDB.prepare('SELECT * FROM students WHERE id = ?').get(finalStudentId);
 
         if (!student) {
