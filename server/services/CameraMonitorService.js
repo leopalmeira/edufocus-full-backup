@@ -121,50 +121,28 @@ class CameraMonitorService {
         if (!this.db) return;
 
         try {
-            // Buscar todas as escolas ativas no sistema
-            const schools = this.db.prepare(`SELECT id, name FROM schools WHERE status = 'active'`).all();
+            // As câmeras são armazenadas no systemDB, não no banco da escola
+            // Buscar câmeras de entrada ativas com URL configurada
+            const cameras = this.db.prepare(`
+                SELECT * FROM cameras 
+                WHERE camera_url IS NOT NULL 
+                AND camera_url != ''
+                AND status = 'active'
+                AND (camera_purpose = 'entrance' OR camera_purpose = 'presence')
+            `).all();
 
-            console.log(`🔍 [CAMERA MONITOR] Verificando ${schools.length} escola(s)...`);
+            if (cameras.length === 0) {
+                console.log(`📹 [CAMERA MONITOR] Nenhuma câmera de entrada ativa encontrada`);
+                return;
+            }
 
-            for (const school of schools) {
-                try {
-                    // Abrir banco da escola
-                    const dbDir = path.resolve(__dirname, '../../database');
-                    const schoolDbPath = path.join(dbDir, `school_${school.id}.db`);
+            console.log(`📹 [CAMERA MONITOR] Encontrada(s) ${cameras.length} câmera(s) de entrada ativa(s)`);
 
-                    if (!fs.existsSync(schoolDbPath)) {
-                        continue; // Escola não tem banco ainda
-                    }
-
-                    const schoolDb = new Database(schoolDbPath);
-
-                    // Buscar câmeras com URL configurada
-                    const cameras = schoolDb.prepare(`
-                        SELECT * FROM cameras 
-                        WHERE url IS NOT NULL 
-                        AND url != ''
-                        AND status != 'offline'
-                    `).all();
-
-                    if (cameras.length > 0) {
-                        console.log(`📹 [${school.name}] Encontrada(s) ${cameras.length} câmera(s) ativa(s)`);
-
-                        for (const cam of cameras) {
-                            // Adicionar school_id à câmera para contexto
-                            cam.school_id = school.id;
-                            cam.camera_url = cam.url; // Mapear para o nome esperado
-                            cam.camera_name = cam.name;
-                            this.processCamera(cam);
-                        }
-                    }
-
-                    schoolDb.close();
-                } catch (schoolErr) {
-                    console.error(`❌ [CAMERA MONITOR] Erro ao processar escola ${school.id}:`, schoolErr.message);
-                }
+            for (const cam of cameras) {
+                this.processCamera(cam);
             }
         } catch (err) {
-            console.error('❌ [CAMERA MONITOR] Erro ao listar escolas:', err.message);
+            console.error('❌ [CAMERA MONITOR] Erro ao listar câmeras:', err.message);
         }
     }
 
