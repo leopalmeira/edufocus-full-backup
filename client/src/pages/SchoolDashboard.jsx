@@ -24,7 +24,7 @@ import SchoolSelector from '../components/SchoolSelector';
 import FinancialPanel from '../components/FinancialPanel';
 import SchoolSaaSBilling from '../components/SchoolSaaSBilling';
 import OnboardingTour from '../components/OnboardingTour';
-import IPCameraRecognition from '../components/IPCameraRecognition';
+import UniversalCameraRecognition from '../components/UniversalCameraRecognition';
 import { useAuth } from '../context/AuthContext';
 import '../styles/TeacherDashboardFixed.css';
 
@@ -1515,28 +1515,21 @@ export default function SchoolDashboard() {
                             </div>
                         )}
 
-                        {/* Seção de Reconhecimento Facial - Câmeras de Entrada */}
-                        {cameras.filter(c => c.camera_purpose === 'entrance' && (c.camera_url || c.url)).length > 0 && (
-                            <div style={{ marginBottom: '2rem' }}>
-                                <h3 style={{ marginBottom: '1rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    🎯 Reconhecimento Facial em Tempo Real
-                                </h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1rem' }}>
-                                    {cameras.filter(c => c.camera_purpose === 'entrance' && (c.camera_url || c.url)).map(camera => (
-                                        <IPCameraRecognition
-                                            key={camera.id}
-                                            cameraUrl={camera.camera_url || camera.url}
-                                            cameraName={camera.camera_name || camera.name}
-                                            schoolId={schoolId}
-                                            students={students}
-                                            onRecognition={(recognition) => {
-                                                console.log('📸 Aluno reconhecido:', recognition);
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        {/* Seção de Reconhecimento Facial */}
+                        <div style={{ marginBottom: '2rem' }}>
+                            <h3 style={{ marginBottom: '1rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                🎯 Reconhecimento Facial em Tempo Real
+                            </h3>
+                            <UniversalCameraRecognition
+                                cameraUrl={cameras.find(c => c.camera_purpose === 'entrance')?.camera_url || cameras.find(c => c.camera_purpose === 'entrance')?.url}
+                                cameraName={cameras.find(c => c.camera_purpose === 'entrance')?.camera_name || 'Câmera de Entrada'}
+                                schoolId={schoolId}
+                                students={students}
+                                onRecognition={(recognition) => {
+                                    console.log('📸 Aluno reconhecido:', recognition);
+                                }}
+                            />
+                        </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             {cameras.map(camera => (
