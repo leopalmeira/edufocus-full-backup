@@ -5175,49 +5175,30 @@ app.get('/api/guardian/schools/:schoolId/classes', authenticateGuardian, (req, r
             return res.status(404).json({ error: 'Escola não encontrada' });
         }
 
-        // Garantir que tabela classes existe
-        try {
-            schoolDB.prepare(`
-                CREATE TABLE IF NOT EXISTS classes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL UNIQUE,
-                    grade TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            `).run();
-        } catch (e) {
-            console.log('📚 [GUARDIAN-CLASSES] Tabela classes já existe ou erro:', e.message);
-        }
-
-        // Primeiro tentar buscar da tabela classes
+        // BUSCAR APENAS TURMAS COM ALUNOS (Ignora tabela classes que pode estar poluída)
+        // Isso reflete a realidade da escola: só mostra turmas onde existem alunos matriculados
         let classes = [];
         try {
-            classes = schoolDB.prepare('SELECT name FROM classes ORDER BY name').all();
-            console.log(`📚 [GUARDIAN-CLASSES] Turmas da tabela classes: ${classes.length}`);
-        } catch (e) {
-            console.log('📚 [GUARDIAN-CLASSES] Erro ao buscar classes:', e.message);
-        }
+            const studentsTableExists = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='students'").get();
 
-        // Se não encontrar na tabela classes, buscar de students
-        if (classes.length === 0) {
-            try {
-                const studentsTableExists = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='students'").get();
-                if (studentsTableExists) {
-                    classes = schoolDB.prepare('SELECT DISTINCT class_name as name FROM students WHERE class_name IS NOT NULL AND class_name != "" ORDER BY class_name').all();
-                    console.log(`📚 [GUARDIAN-CLASSES] Turmas de students: ${classes.length}`);
-
-
-                }
-            } catch (e) {
-                console.log('📚 [GUARDIAN-CLASSES] Erro ao buscar de students:', e.message);
+            if (studentsTableExists) {
+                classes = schoolDB.prepare(`
+                    SELECT DISTINCT class_name as name 
+                    FROM students 
+                    WHERE class_name IS NOT NULL AND class_name != "" 
+                    ORDER BY class_name
+                `).all();
             }
+        } catch (e) {
+            console.log('📚 [GUARDIAN-CLASSES] Erro ao buscar de students:', e.message);
         }
+
+        console.log(`📚 [GUARDIAN-CLASSES] Total de turmas com alunos: ${classes.length}`);
 
         if (classes.length === 0) {
-            console.log(`📚 [GUARDIAN-CLASSES] Nenhuma turma encontrada para escola ${schoolId}. Retornando vazio.`);
+            console.log(`📚 [GUARDIAN-CLASSES] Nenhuma turma com alunos encontrada para escola ${schoolId}`);
         }
 
-        console.log(`📚 [GUARDIAN-CLASSES] Total de turmas: ${classes.length}`);
         res.json(classes);
     } catch (error) {
         console.error('❌ [GUARDIAN-CLASSES] Erro inesperado:', error.message);
