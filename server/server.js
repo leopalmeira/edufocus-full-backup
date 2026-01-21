@@ -5175,38 +5175,77 @@ app.get('/api/guardian/schools/:schoolId/classes', authenticateGuardian, (req, r
             return res.status(404).json({ error: 'Escola não encontrada' });
         }
 
-        // Primeiro tentar buscar da tabela classes (se existir)
-        let classes = [];
+        // Garantir que tabela classes existe
         try {
-            // Verificar se tabela existe
-            const tableExists = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='classes'").get();
-            if (tableExists) {
-                classes = schoolDB.prepare('SELECT name FROM classes ORDER BY name').all();
-                console.log(`📚 [GUARDIAN-CLASSES] Turmas da tabela classes: ${classes.length}`);
-            }
+            schoolDB.prepare(`
+                CREATE TABLE IF NOT EXISTS classes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    grade TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `).run();
         } catch (e) {
-            console.log('📚 [GUARDIAN-CLASSES] Tabela classes não existe ou erro:', e.message);
+            console.log('📚 [GUARDIAN-CLASSES] Tabela classes já existe ou erro:', e.message);
         }
 
-        // Se não encontrar, buscar turmas únicas da tabela students
+        // Primeiro tentar buscar da tabela classes
+        let classes = [];
+        try {
+            classes = schoolDB.prepare('SELECT name FROM classes ORDER BY name').all();
+            console.log(`📚 [GUARDIAN-CLASSES] Turmas da tabela classes: ${classes.length}`);
+        } catch (e) {
+            console.log('📚 [GUARDIAN-CLASSES] Erro ao buscar classes:', e.message);
+        }
+
+        // Se não encontrar na tabela classes, buscar de students
         if (classes.length === 0) {
             try {
                 const studentsTableExists = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='students'").get();
                 if (studentsTableExists) {
                     classes = schoolDB.prepare('SELECT DISTINCT class_name as name FROM students WHERE class_name IS NOT NULL AND class_name != "" ORDER BY class_name').all();
                     console.log(`📚 [GUARDIAN-CLASSES] Turmas de students: ${classes.length}`);
+
+                    // Salvar essas turmas na tabela classes para futuro uso
+                    for (const cls of classes) {
+                        try {
+                            schoolDB.prepare('INSERT OR IGNORE INTO classes (name) VALUES (?)').run(cls.name);
+                        } catch (e) { }
+                    }
                 }
             } catch (e) {
                 console.log('📚 [GUARDIAN-CLASSES] Erro ao buscar de students:', e.message);
             }
         }
 
-        // Se ainda não tem turmas, retornar array vazio (não é erro)
+        // Se ainda não tem turmas, criar turmas padrão
         if (classes.length === 0) {
-            console.log(`📚 [GUARDIAN-CLASSES] Nenhuma turma encontrada para escola ${schoolId}`);
+            console.log(`📚 [GUARDIAN-CLASSES] Criando turmas padrão para escola ${schoolId}...`);
+            const defaultClasses = [
+                '1º Ano A', '1º Ano B',
+                '2º Ano A', '2º Ano B',
+                '3º Ano A', '3º Ano B',
+                '4º Ano A', '4º Ano B',
+                '5º Ano A', '5º Ano B',
+                '6º Ano A', '6º Ano B',
+                '7º Ano A', '7º Ano B',
+                '8º Ano A', '8º Ano B',
+                '9º Ano A', '9º Ano B',
+                'Maternal', 'Jardim I', 'Jardim II'
+            ];
+
+            for (const name of defaultClasses) {
+                try {
+                    schoolDB.prepare('INSERT OR IGNORE INTO classes (name) VALUES (?)').run(name);
+                } catch (e) { }
+            }
+
+            // Buscar novamente
+            classes = schoolDB.prepare('SELECT name FROM classes ORDER BY name').all();
+            console.log(`📚 [GUARDIAN-CLASSES] Turmas padrão criadas: ${classes.length}`);
         }
 
-        console.log(`📚 [GUARDIAN-CLASSES] Total de turmas encontradas: ${classes.length}`);
+        console.log(`📚 [GUARDIAN-CLASSES] Total de turmas: ${classes.length}`);
         res.json(classes);
     } catch (error) {
         console.error('❌ [GUARDIAN-CLASSES] Erro inesperado:', error.message);
