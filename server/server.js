@@ -22,6 +22,9 @@ const SECRET_KEY = process.env.SECRET_KEY || 'edufocus_secret_key_change_me';
 
 // --- AUTO-RECONNECT WHATSAPP ON BOOT ---
 async function reconnectWhatsAppSessions() {
+    console.log('⚠️ WhatsApp desativado conforme solicitação do usuário.');
+    return;
+    /*
     // WhatsApp ativado em produção
     if (process.env.NODE_ENV === 'production') {
         console.log('✅ WhatsApp ativado em produção (Render)');
@@ -40,6 +43,7 @@ async function reconnectWhatsAppSessions() {
             }
         }
     }
+    */
 }
 
 // Tentar importar seed opcionalmente
@@ -456,7 +460,8 @@ app.post('/api/attendance/arrival', authenticateToken, async (req, res) => {
             VALUES (?, ?, 'arrival')
         `).run(student_id, timestamp);
 
-        // Enviar notificação WhatsApp
+        // Enviar notificação WhatsApp - DESATIVADO
+        /*
         if (student.phone) {
             const whatsappService = getWhatsAppService(schoolId);
             const result = await whatsappService.sendArrivalNotification(
@@ -477,6 +482,7 @@ app.post('/api/attendance/arrival', authenticateToken, async (req, res) => {
                 `).run(schoolId, student_id, student.phone, timestamp);
             }
         }
+        */
 
         res.json({
             success: true,
@@ -513,7 +519,8 @@ app.post('/api/attendance/departure', authenticateToken, async (req, res) => {
             VALUES (?, ?, 'departure')
         `).run(student_id, timestamp);
 
-        // Enviar notificação WhatsApp
+        // Enviar notificação WhatsApp - DESATIVADO
+        /*
         if (student.phone) {
             const whatsappService = getWhatsAppService(schoolId);
             await whatsappService.sendDepartureNotification(
@@ -526,6 +533,7 @@ app.post('/api/attendance/departure', authenticateToken, async (req, res) => {
                 new Date(timestamp)
             );
         }
+        */
 
         res.json({
             success: true,
