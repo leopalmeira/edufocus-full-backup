@@ -24,6 +24,7 @@ import SchoolSelector from '../components/SchoolSelector';
 import FinancialPanel from '../components/FinancialPanel';
 import SchoolSaaSBilling from '../components/SchoolSaaSBilling';
 import OnboardingTour from '../components/OnboardingTour';
+import IPCameraRecognition from '../components/IPCameraRecognition';
 import { useAuth } from '../context/AuthContext';
 import '../styles/TeacherDashboardFixed.css';
 
@@ -1514,17 +1515,40 @@ export default function SchoolDashboard() {
                             </div>
                         )}
 
+                        {/* Seção de Reconhecimento Facial - Câmeras de Entrada */}
+                        {cameras.filter(c => c.camera_purpose === 'entrance' && (c.camera_url || c.url)).length > 0 && (
+                            <div style={{ marginBottom: '2rem' }}>
+                                <h3 style={{ marginBottom: '1rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    🎯 Reconhecimento Facial em Tempo Real
+                                </h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1rem' }}>
+                                    {cameras.filter(c => c.camera_purpose === 'entrance' && (c.camera_url || c.url)).map(camera => (
+                                        <IPCameraRecognition
+                                            key={camera.id}
+                                            cameraUrl={camera.camera_url || camera.url}
+                                            cameraName={camera.camera_name || camera.name}
+                                            schoolId={schoolId}
+                                            students={students}
+                                            onRecognition={(recognition) => {
+                                                console.log('📸 Aluno reconhecido:', recognition);
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             {cameras.map(camera => (
                                 <div key={camera.id} className="glass-panel" style={{ padding: '1.5rem', borderLeft: camera.status === 'active' ? '4px solid #10b981' : '4px solid #ef4444' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                         <div>
                                             <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                {camera.camera_purpose === 'entrance' ? '🚪' : '📚'} {camera.camera_name}
+                                                {camera.camera_purpose === 'entrance' ? '🚪' : '📚'} {camera.camera_name || camera.name}
                                             </h3>
                                             <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
                                                 <div><strong>Finalidade:</strong> {camera.camera_purpose === 'entrance' ? 'Entrada (Face ID)' : 'Monitoramento'}</div>
-                                                <div><strong>URL:</strong> {camera.camera_url}</div>
+                                                <div><strong>URL:</strong> {camera.camera_url || camera.url}</div>
                                                 <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem' }}>
                                                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: camera.status === 'active' ? '#10b981' : '#ef4444' }}>
                                                         <div style={{ width: 8, height: 8, borderRadius: '50%', background: camera.status === 'active' ? '#10b981' : '#ef4444' }} />
