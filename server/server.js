@@ -460,6 +460,17 @@ app.post('/api/attendance/arrival', authenticateToken, async (req, res) => {
             VALUES (?, ?, 'arrival')
         `).run(student_id, timestamp);
 
+        // 🔔 Registrar em access_logs para notificação do Guardian App
+        try {
+            schoolDB.prepare(`
+                INSERT INTO access_logs (student_id, event_type, timestamp, notified_guardian)
+                VALUES (?, 'arrival', ?, 0)
+            `).run(student_id, timestamp);
+            console.log(`🔔 [ARRIVAL] Notificação registrada em access_logs para aluno ${student.name}`);
+        } catch (logError) {
+            console.error(`❌ [ARRIVAL] Erro ao criar access_log:`, logError.message);
+        }
+
         // Enviar notificação WhatsApp - DESATIVADO
         /*
         if (student.phone) {
@@ -518,6 +529,17 @@ app.post('/api/attendance/departure', authenticateToken, async (req, res) => {
             INSERT INTO attendance (student_id, timestamp, type)
             VALUES (?, ?, 'departure')
         `).run(student_id, timestamp);
+
+        // 🔔 Registrar em access_logs para notificação do Guardian App
+        try {
+            schoolDB.prepare(`
+                INSERT INTO access_logs (student_id, event_type, timestamp, notified_guardian)
+                VALUES (?, 'departure', ?, 0)
+            `).run(student_id, timestamp);
+            console.log(`🔔 [DEPARTURE] Notificação registrada em access_logs para aluno ${student.name}`);
+        } catch (logError) {
+            console.error(`❌ [DEPARTURE] Erro ao criar access_log:`, logError.message);
+        }
 
         // Enviar notificação WhatsApp - DESATIVADO
         /*
@@ -4522,6 +4544,17 @@ app.post('/api/attendance/arrival', authenticateToken, async (req, res) => {
         `).run(student_id, timestamp);
 
         console.log(`✅ Presença registrada para ${student.name}`);
+
+        // 🔔 Registrar em access_logs para notificação do Guardian App
+        try {
+            schoolDB.prepare(`
+                INSERT INTO access_logs (student_id, event_type, timestamp, notified_guardian)
+                VALUES (?, 'arrival', ?, 0)
+            `).run(student_id, timestamp);
+            console.log(`🔔 [ARRIVAL-V2] Notificação registrada em access_logs para aluno ${student.name}`);
+        } catch (logError) {
+            console.error(`❌ [ARRIVAL-V2] Erro ao criar access_log:`, logError.message);
+        }
 
         // 4. ENVIAR WHATSAPP AUTOMATICAMENTE
         try {
