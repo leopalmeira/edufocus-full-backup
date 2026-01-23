@@ -6725,6 +6725,54 @@ app.get('/api/guardian/my-students', authenticateGuardian, (req, res) => {
 });
 
 
+
+// ==================== TEACHER ROUTES ====================
+
+// POST /api/teacher/grades - Lançar Nota Simplificada
+app.post('/api/teacher/grades', async (req, res) => {
+    try {
+        const { studentId, subject, score, period, schoolId } = req.body;
+
+        // Validação básica
+        if (!studentId || score === undefined) return res.status(400).json({ error: 'Dados incompletos' });
+
+        // Identificar escola
+        const targetSchoolId = schoolId || req.body.school_id;
+        if (!targetSchoolId) return res.status(400).json({ error: 'ID da escola necessário' });
+
+        const schoolDB = getSchoolDB(targetSchoolId);
+
+        // Verificar se student existe
+        const student = schoolDB.prepare('SELECT id FROM students WHERE id = ?').get(studentId);
+        if (!student) return res.status(404).json({ error: 'Aluno não encontrado' });
+
+        // Criar exame (Avaliação)
+        const title = `${period || 'Nota'} - ${subject || 'Geral'}`;
+        const userId = 1; // Default teacher ID (Sistema)
+
+        // Inserir Exame
+        const stmtExam = schoolDB.prepare(`
+            INSERT INTO exams (teacher_id, title, total_points, created_at)
+            VALUES (?, ?, ?, datetime('now'))
+        `);
+        const resultExam = stmtExam.run(userId, title, 10);
+        const examId = resultExam.lastInsertRowid;
+
+        // Inserir Resultado
+        const stmtResult = schoolDB.prepare(`
+            INSERT INTO exam_results (exam_id, student_id, score, graded_at)
+            VALUES (?, ?, ?, datetime('now'))
+        `);
+        stmtResult.run(examId, studentId, score);
+
+        res.json({ success: true, message: 'Nota salva com sucesso' });
+
+    } catch (e) {
+        console.error('Erro ao salvar nota:', e);
+        res.status(500).json({ error: 'Erro interno: ' + e.message });
+    }
+});
+
 // ==================== SERVIR FRONTEND (PRODUÇÃO) ====================
 // Serve os arquivos estáticos do Admin Panel (Pasta client/dist)
 app.use(express.static(path.join(__dirname, '../client/dist')));

@@ -2668,6 +2668,7 @@
                 `).join('');
 
                 console.log('✅ Carregados', myStudentsData.length, 'alunos com localização da escola');
+                if (typeof updateStudentSelects === 'function') updateStudentSelects();
 
             } catch (e) {
                 console.error('Erro ao carregar filhos:', e);
@@ -2701,60 +2702,7 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
         // let currentAttendanceData = []; -- This was fine if not declared before, but cleaner to declare it near usage or global.
 
 
-        function switchAcademicTab(tab) {
-            // Update Tab Buttons
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            if (tab === 'attendance') document.getElementById('tabBtnAttendance').classList.add('active');
-            if (tab === 'grades') document.getElementById('tabBtnGrades').classList.add('active');
-            if (tab === 'reports') document.getElementById('tabBtnReports').classList.add('active');
 
-            // Hide all contents
-            document.getElementById('tabAttendanceContent').classList.add('hidden');
-            document.getElementById('tabGradesContent').classList.add('hidden');
-            document.getElementById('tabReportsContent').classList.add('hidden');
-
-            // Show selected
-            if (tab === 'attendance') {
-                document.getElementById('tabAttendanceContent').classList.remove('hidden');
-                populateAcademicSelects();
-                // Force load if student selected
-                const sel = document.getElementById('reportStudentSelect');
-                if (sel) {
-                    if (!sel.value && myStudentsData.length > 0) sel.value = myStudentsData[0].id;
-                    if (sel.value) loadReportStudent(sel.value);
-                }
-            } else if (tab === 'grades') {
-                document.getElementById('tabGradesContent').classList.remove('hidden');
-                populateAcademicSelects();
-            } else if (tab === 'reports') {
-                document.getElementById('tabReportsContent').classList.remove('hidden');
-                populateAcademicSelects();
-            }
-        }
-
-        function populateAcademicSelects() {
-            // Populate select boxes if they are empty
-            const selects = ['reportStudentSelect', 'gradesStudentSelect', 'reportsStudentSelect'];
-
-            selects.forEach(id => {
-                const el = document.getElementById(id);
-                // Populate if empty
-                if (el && el.options.length <= 1 && myStudentsData.length > 0) {
-                    myStudentsData.forEach(s => {
-                        const opt = document.createElement('option');
-                        opt.value = s.id;
-                        opt.textContent = s.name;
-                        el.appendChild(opt);
-                    });
-                }
-
-                // FORCE selection if nothing selected and data exists
-                if (el && !el.value && myStudentsData.length > 0) {
-                    el.value = myStudentsData[0].id;
-                    el.dispatchEvent(new Event('change'));
-                }
-            });
-        }
 
         async function loadReportStudent(studentId) {
             if (!studentId) return;
@@ -2915,13 +2863,38 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
 
         // --- ACADEMIC TABS LOGIC ---
 
-        function populateStudentSelect(selectEl) {
-            if (!selectEl) return;
-            selectEl.innerHTML = '<option value="">Selecione...</option>';
-            myStudentsData.forEach(s => {
-                selectEl.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+        function updateStudentSelects() {
+            const selects = ['reportStudentSelect', 'gradesStudentSelect', 'reportsStudentSelect'];
+
+            selects.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    const oldVal = el.value;
+                    el.innerHTML = '<option value="">Selecione...</option>';
+                    myStudentsData.forEach(s => {
+                        el.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+                    });
+
+                    if (oldVal && myStudentsData.find(s => s.id == oldVal)) {
+                        el.value = oldVal;
+                    } else if (myStudentsData.length > 0) {
+                        el.value = myStudentsData[0].id;
+                    }
+                }
             });
+
+            const academicScreen = document.getElementById('academicScreen');
+            if (academicScreen && !academicScreen.classList.contains('hidden')) {
+                const tabAtt = document.getElementById('tabAttendanceContent');
+                if (tabAtt && !tabAtt.classList.contains('hidden')) {
+                    const sel = document.getElementById('reportStudentSelect');
+                    if (sel && sel.value) loadReportStudent(sel.value);
+                }
+            }
         }
+
+        // Alias for compatibility
+        function populateStudentSelect(el) { updateStudentSelects(); }
 
         function switchAcademicTab(tab) {
             // Update Headers
@@ -2943,25 +2916,23 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
 
             if (tab === 'attendance') {
                 if (tabAttendance) tabAttendance.classList.remove('hidden');
+                const sel = document.getElementById('reportStudentSelect');
+                if (sel) {
+                    if (sel.options.length <= 1) updateStudentSelects();
+                    if (sel.value) loadReportStudent(sel.value);
+                }
             } else if (tab === 'grades') {
                 if (tabGrades) tabGrades.classList.remove('hidden');
-                // Auto load
                 const sel = document.getElementById('gradesStudentSelect');
                 if (sel) {
-                    if (sel.options.length <= 1 && myStudentsData.length > 0) {
-                        populateStudentSelect(sel);
-                    }
-                    if (!sel.value && myStudentsData.length > 0) sel.value = myStudentsData[0].id;
+                    if (sel.options.length <= 1) updateStudentSelects();
                     if (sel.value) loadGrades(sel.value);
                 }
             } else if (tab === 'reports') {
                 if (tabReports) tabReports.classList.remove('hidden');
                 const sel = document.getElementById('reportsStudentSelect');
                 if (sel) {
-                    if (sel.options.length <= 1 && myStudentsData.length > 0) {
-                        populateStudentSelect(sel);
-                    }
-                    if (!sel.value && myStudentsData.length > 0) sel.value = myStudentsData[0].id;
+                    if (sel.options.length <= 1) updateStudentSelects();
                     if (sel.value) loadReports(sel.value);
                 }
             }
