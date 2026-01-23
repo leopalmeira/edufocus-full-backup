@@ -5261,22 +5261,41 @@ app.get('/api/guardian/schools/:schoolId/classes', authenticateGuardian, (req, r
             return res.status(404).json({ error: 'Escola não encontrada' });
         }
 
-        // BUSCAR APENAS TURMAS COM ALUNOS (Ignora tabela classes que pode estar poluída)
-        // Isso reflete a realidade da escola: só mostra turmas onde existem alunos matriculados
+        // BUSCAR TURMAS (Students e Classes)
         let classes = [];
         try {
+            // 1. Tentar buscar da tabela CLASSES (Cadastro oficial)
+            const classesTableExists = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='classes'").get();
+            if (classesTableExists) {
+                const classesFromTable = schoolDB.prepare("SELECT name FROM classes WHERE name IS NOT NULL AND name != '' ORDER BY name").all();
+                classesFromTable.forEach(c => {
+                    if (c.name) classes.push({ name: c.name });
+                });
+            }
+
+            // 2. Tentar buscar da tabela STUDENTS (Turmas ativas em uso) - complementar
             const studentsTableExists = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='students'").get();
 
             if (studentsTableExists) {
-                classes = schoolDB.prepare(`
+                const classesFromStudents = schoolDB.prepare(`
                     SELECT DISTINCT class_name as name 
                     FROM students 
                     WHERE class_name IS NOT NULL AND class_name != "" 
-                    ORDER BY class_name
                 `).all();
+
+                classesFromStudents.forEach(c => {
+                    // Adicionar se já não existir (evitar duplicatas)
+                    if (c.name && !classes.find(existing => existing.name === c.name)) {
+                        classes.push({ name: c.name });
+                    }
+                });
             }
+
+            // Ordenar alfabeticamente
+            classes.sort((a, b) => a.name.toString().localeCompare(b.name.toString()));
+
         } catch (e) {
-            console.log('📚 [GUARDIAN-CLASSES] Erro ao buscar de students:', e.message);
+            console.log('📚 [GUARDIAN-CLASSES] Erro ao buscar turmas:', e.message);
         }
 
         console.log(`📚 [GUARDIAN-CLASSES] Total de turmas com alunos: ${classes.length}`);
