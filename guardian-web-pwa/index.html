@@ -2913,6 +2913,190 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
             if (absenceEl) absenceEl.textContent = absenceCount;
         }
 
+        // --- ACADEMIC TABS LOGIC ---
+
+        function populateStudentSelect(selectEl) {
+            if (!selectEl) return;
+            selectEl.innerHTML = '<option value="">Selecione...</option>';
+            myStudentsData.forEach(s => {
+                selectEl.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+            });
+        }
+
+        function switchAcademicTab(tab) {
+            // Update Headers
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            const btnMap = { 'attendance': 'tabBtnAttendance', 'grades': 'tabBtnGrades', 'reports': 'tabBtnReports' };
+            if (btnMap[tab]) {
+                const btn = document.getElementById(btnMap[tab]);
+                if (btn) btn.classList.add('active');
+            }
+
+            // Toggle Content
+            const tabAttendance = document.getElementById('tabAttendanceContent');
+            const tabGrades = document.getElementById('tabGradesContent');
+            const tabReports = document.getElementById('tabReportsContent');
+
+            if (tabAttendance) tabAttendance.classList.add('hidden');
+            if (tabGrades) tabGrades.classList.add('hidden');
+            if (tabReports) tabReports.classList.add('hidden');
+
+            if (tab === 'attendance') {
+                if (tabAttendance) tabAttendance.classList.remove('hidden');
+            } else if (tab === 'grades') {
+                if (tabGrades) tabGrades.classList.remove('hidden');
+                // Auto load
+                const sel = document.getElementById('gradesStudentSelect');
+                if (sel) {
+                    if (sel.options.length <= 1 && myStudentsData.length > 0) {
+                        populateStudentSelect(sel);
+                    }
+                    if (!sel.value && myStudentsData.length > 0) sel.value = myStudentsData[0].id;
+                    if (sel.value) loadGrades(sel.value);
+                }
+            } else if (tab === 'reports') {
+                if (tabReports) tabReports.classList.remove('hidden');
+                const sel = document.getElementById('reportsStudentSelect');
+                if (sel) {
+                    if (sel.options.length <= 1 && myStudentsData.length > 0) {
+                        populateStudentSelect(sel);
+                    }
+                    if (!sel.value && myStudentsData.length > 0) sel.value = myStudentsData[0].id;
+                    if (sel.value) loadReports(sel.value);
+                }
+            }
+        }
+
+        async function loadGrades(studentId) {
+            if (!studentId) return;
+            const container = document.getElementById('gradesList');
+            if (container) container.innerHTML = '<div style="text-align:center; padding:20px;">Carregando notas...</div>';
+
+            const student = myStudentsData.find(s => s.id == studentId);
+            if (!student) return;
+
+            try {
+                const token = localStorage.getItem('token');
+                const schoolId = student.schoolId || student.school_id;
+                const res = await fetch(`${API_URL}/guardian/grades?schoolId=${schoolId}&studentId=${studentId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                renderGrades(data);
+            } catch (e) {
+                console.error("Erro grades:", e);
+                if (container) container.innerHTML = '<div style="text-align:center; padding:20px; color:red;">Erro ao carregar notas</div>';
+            }
+        }
+
+        function renderGrades(grades) {
+            const container = document.getElementById('gradesList');
+            if (!container) return;
+
+            if (!grades || grades.length === 0) {
+                container.innerHTML = `
+                    <div class="empty">
+                        <div class="empty-icon">📝</div>
+                        <p class="empty-title">Sem notas</p>
+                        <p class="empty-text">Nenhuma avaliação encontrada.</p>
+                    </div>`;
+                return;
+            }
+
+            let html = '';
+            grades.forEach(g => {
+                let scoreColor = '#374151';
+                if (g.total > 0) {
+                    const pct = (g.score / g.total) * 100;
+                    if (pct >= 70) scoreColor = '#10b981';
+                    else if (pct >= 50) scoreColor = '#f59e0b';
+                    else scoreColor = '#ef4444';
+                }
+
+                html += `
+                    <div class="card">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <div>
+                                <h3 style="font-weight:600; font-size:16px; margin:0;">${g.title}</h3>
+                                <p style="font-size:13px; color:#6b7280; margin:4px 0;">${g.subject} • ${g.teacher}</p>
+                                <p style="font-size:12px; color:#9ca3af;">${new Date(g.date).toLocaleDateString()}</p>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-size:24px; font-weight:700; color:${scoreColor};">${g.score}</div>
+                                <div style="font-size:12px; color:#9ca3af;">de ${g.total}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        async function loadReports(studentId) {
+            if (!studentId) return;
+            const container = document.getElementById('reportsList');
+            if (container) container.innerHTML = '<div style="text-align:center; padding:20px;">Carregando relatórios...</div>';
+
+            const student = myStudentsData.find(s => s.id == studentId);
+            if (!student) return;
+
+            try {
+                const token = localStorage.getItem('token');
+                const schoolId = student.schoolId || student.school_id;
+                const res = await fetch(`${API_URL}/guardian/reports?schoolId=${schoolId}&studentId=${studentId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                renderReports(data);
+            } catch (e) {
+                console.error("Erro reports:", e);
+                if (container) container.innerHTML = '<div style="text-align:center; padding:20px; color:red;">Erro ao carregar relatórios</div>';
+            }
+        }
+
+        function renderReports(reports) {
+            const container = document.getElementById('reportsList');
+            if (!container) return;
+
+            if (!reports || reports.length === 0) {
+                container.innerHTML = `
+                    <div class="empty">
+                        <div class="empty-icon">📊</div>
+                        <p class="empty-title">Sem relatórios</p>
+                        <p class="empty-text">Nenhum relatório acadêmico disponível.</p>
+                    </div>`;
+                return;
+            }
+
+            let html = '';
+            reports.forEach(r => {
+                html += `
+                    <div class="card">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <h3 style="font-weight:600; font-size:16px; margin:0;">Relatório Periódico</h3>
+                                <p style="font-size:13px; color:#6b7280; margin:4px 0;">${new Date(r.period_start).toLocaleDateString()} a ${new Date(r.period_end).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                                <span style="background:#e0e7ff; color:#4338ca; padding:4px 8px; border-radius:12px; font-size:12px; font-weight:600;">Disponível</span>
+                            </div>
+                        </div>
+                        <div style="margin-top:10px; display:flex; gap:10px;">
+                            <div style="flex:1; background:#f9fafb; padding:8px; border-radius:8px; text-align:center;">
+                                <div style="font-size:12px; color:#6b7280;">Atenção</div>
+                                <div style="font-weight:600;">${r.avg_attention || '-'}%</div>
+                            </div>
+                            <div style="flex:1; background:#f9fafb; padding:8px; border-radius:8px; text-align:center;">
+                                <div style="font-size:12px; color:#6b7280;">Foco</div>
+                                <div style="font-weight:600;">${r.avg_focus || '-'}%</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
         function updateStats() {
             // Count unique days present in this month view
             // Actually API returns records for this month. 

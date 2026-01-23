@@ -6359,17 +6359,90 @@ app.get('/api/guardian/invoices', authenticateGuardian, (req, res) => {
 // Serve data from school_db read-only for guardian
 // NOTA: Endpoint /api/guardian/student-attendance foi movido para linha ~3028 (consolidado)
 
-// 15. GUARDIAN: Grades (Notas) - MOCK/Placeholder
+
+function safeJsonParse(str) {
+    try { return JSON.parse(str); } catch (e) { return null; }
+}
+
+// 15. GUARDIAN: Grades (Notas)
 app.get('/api/guardian/grades', authenticateGuardian, (req, res) => {
-    // Retornando array vazio para evitar 404
-    res.json([]);
+    const { schoolId, studentId } = req.query;
+    if (!schoolId || !studentId) return res.json([]);
+
+    try {
+        const schoolDB = getSchoolDB(schoolId);
+        const systemDB = getSystemDB();
+
+        // Verificar tabelas
+        const hasExams = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='exam_results'").get();
+        if (!hasExams) return res.json([]);
+
+        // Buscar notas
+        const results = schoolDB.prepare(`
+            SELECT r.score, r.graded_at, e.title, e.total_points, e.teacher_id, e.created_at
+            FROM exam_results r
+            JOIN exams e ON r.exam_id = e.id
+            WHERE r.student_id = ?
+            ORDER BY r.graded_at DESC
+        `).all(studentId);
+
+        // Buscar professores para saber a matéria
+        const teacherIds = [...new Set(results.map(r => r.teacher_id).filter(id => id))];
+        let teachersMap = {};
+
+        if (teacherIds.length > 0) {
+            const placeholders = teacherIds.map(() => '?').join(',');
+            try {
+                const teachers = systemDB.prepare(`SELECT id, name, subject FROM teachers WHERE id IN (${placeholders})`).all(...teacherIds);
+                teachers.forEach(t => teachersMap[t.id] = t);
+            } catch (err) { console.error('Erro ao buscar teachers:', err.message); }
+        }
+
+        const grades = results.map(r => {
+            const t = teachersMap[r.teacher_id] || {};
+            return {
+                title: r.title,
+                score: r.score,
+                total: r.total_points,
+                date: r.graded_at || r.created_at,
+                subject: t.subject || 'Geral',
+                teacher: t.name || ''
+            };
+        });
+
+        res.json(grades);
+    } catch (e) {
+        console.error('Erro grades:', e);
+        res.json([]);
+    }
 });
 
-// 16. GUARDIAN: Reports (Relatórios) - MOCK/Placeholder
+// 16. GUARDIAN: Reports (Relatórios)
 app.get('/api/guardian/reports', authenticateGuardian, (req, res) => {
-    // Retornando array vazio para evitar 404
-    res.json([]);
+    const { schoolId, studentId } = req.query;
+    if (!schoolId || !studentId) return res.json([]);
+
+    try {
+        const schoolDB = getSchoolDB(schoolId);
+        const hasReports = schoolDB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='student_reports'").get();
+        if (!hasReports) return res.json([]);
+
+        const reports = schoolDB.prepare(`
+            SELECT * FROM student_reports WHERE student_id = ? ORDER BY created_at DESC
+        `).all(studentId);
+
+        const parsed = reports.map(r => ({
+            ...r,
+            subjects_performance: safeJsonParse(r.subjects_performance)
+        }));
+
+        res.json(parsed);
+    } catch (e) {
+        console.error('Erro reports:', e);
+        res.json([]);
+    }
 });
+
 
 // 17. GUARDIAN: Search Schools (Busca Escolas para Vínculo)
 app.get('/api/guardian/schools', (req, res) => {
