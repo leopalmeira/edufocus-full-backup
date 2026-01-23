@@ -2876,44 +2876,34 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
                 let textColor = '';
                 let className = '';
 
-                if (!isFuture && !isWeekend) {
-                    if (isPresent) {
-                        bgColor = '#10b981';
-                        textColor = 'white';
-                        className = 'day-present';
-                        presenceCount++;
-                        window.lastPresenceDays.push(d);
-                    } else {
-                        bgColor = '#ef4444';
-                        textColor = 'white';
-                        className = 'day-absent';
-                        absenceCount++;
-                        window.lastAbsenceDays.push(d);
-                    }
+                if (isPresent) {
+                    bgColor = '#10b981';
+                    textColor = 'white';
+                    className = 'day-present';
+                    presenceCount++;
+                    window.lastPresenceDays.push(d);
                 } else if (isFuture) {
                     bgColor = '#f3f4f6';
                     textColor = '#9ca3af';
-                } else {
-                    // Weekend
+                } else if (isWeekend) {
                     bgColor = '#f9fafb';
                     textColor = '#d1d5db';
+                } else {
+                    // Dia útil passado sem presença = Falta
+                    bgColor = '#ef4444';
+                    textColor = 'white';
+                    className = 'day-absent';
+                    absenceCount++;
+                    window.lastAbsenceDays.push(d);
                 }
 
-                // Buscar foto do aluno se presente
-                const record = records.length > 0 ? records[0] : null;
-                const photoUrl = record && record.photo_url ? record.photo_url : null;
-
-                // Se tiver foto e for dia de presença, mostrar como fundo
-                const photoStyle = (photoUrl && isPresent)
-                    ? `background-image: url('${photoUrl}'); background-size: cover; background-position: center;`
-                    : `background: ${bgColor};`;
-
                 container.innerHTML += `
-                    <div class="calendar-day ${className}" style="${photoStyle} color: ${textColor}; font-weight: 600; position: relative;">
-                        <span style="position: relative; z-index: 2; ${isPresent && photoUrl ? 'text-shadow: 0 1px 3px rgba(0,0,0,0.8);' : ''}">${d}</span>
-                        ${isPresent && photoUrl ? '<div style="position: absolute; inset: 0; background: rgba(16,185,129,0.4); border-radius: inherit;"></div>' : ''}
+                    <div class="calendar-day ${className}" style="background: ${bgColor}; color: ${textColor}; font-weight: 600; position: relative;">
+                        <span style="position: relative; z-index: 2;">${d}</span>
                     </div>
                 `;
+
+
             }
 
             // Update stat cards
