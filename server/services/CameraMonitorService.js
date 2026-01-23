@@ -261,22 +261,28 @@ class CameraMonitorService {
 
     registerAttendance(db, student, schoolId) {
         // Verificar se já tem presença HOJE
-        const today = new Date().toISOString().split('T')[0];
-        const exists = db.prepare("SELECT id FROM attendance WHERE student_id = ? AND date = ?").get(student.id, today);
+        // Schema: id, student_id, type, timestamp
+        try {
+            const exists = db.prepare("SELECT id FROM attendance WHERE student_id = ? AND date(timestamp) = date('now', 'localtime') AND type = 'entry'").get(student.id);
 
-        if (!exists) {
-            db.prepare("INSERT INTO attendance (student_id, date, status, time) VALUES (?, ?, 'present', ?)")
-                .run(student.id, today, new Date().toLocaleTimeString());
+            if (!exists) {
+                db.prepare("INSERT INTO attendance (student_id, type) VALUES (?, 'entry')").run(student.id);
 
-            console.log(`📝 Presença registrada para ${student.name}`);
+                console.log(`📝 Presença registrada para ${student.name}`);
 
-            // Criar Notificação
-            try {
-                db.prepare("INSERT INTO notifications (student_id, title, message, read, created_at) VALUES (?, ?, ?, 0, datetime('now'))")
-                    .run(student.id, 'Chegada na Escola', `O aluno ${student.name} chegou na escola.`, new Date().toISOString());
-            } catch (e) {
-                // Ignore se tabela não existir (migração pendente)
+                // Criar Notificação (Log para envio posterior)
+                try {
+                    // Tentar inserir em access_logs para o PWA pegar
+                    const checkLog = db.prepare("SELECT id FROM access_logs WHERE student_id = ? AND date(timestamp) = date('now', 'localtime')").get(student.id);
+                    if (!checkLog) {
+                        db.prepare("INSERT INTO access_logs (student_id, event_type, notified_guardian) VALUES (?, 'arrival', 0)").run(student.id);
+                    }
+                } catch (e) {
+                    console.error('Erro ao registrar access_log:', e.message);
+                }
             }
+        } catch (e) {
+            console.error('Erro ao registrar presença no DB:', e.message);
         }
     }
 }

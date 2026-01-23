@@ -6271,32 +6271,70 @@ app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => 
 
         console.log(`🔍 [ATTENDANCE] Buscando frequencia: Student=${studentId}, School=${schoolId}, ${month}/${year}`);
 
-        // Buscar tanto da tabela attendance quanto access_logs para garantir dados completos
-        let query = `
-            SELECT timestamp, type FROM attendance 
-            WHERE student_id = ?
-        `;
+        // Preparar filtro de data
+        let dateFilter = '';
         const params = [studentId];
 
-        // Aplicar filtro de mês/ano se fornecido
         if (month && year) {
             const m = String(month).padStart(2, '0');
             const y = String(year);
             const startDate = `${y}-${m}-01`;
             const endDate = `${y}-${m}-31`;
-            query += ` AND date(timestamp) BETWEEN date(?) AND date(?)`;
+            dateFilter = ` AND date(timestamp) BETWEEN date(?) AND date(?)`;
             params.push(startDate, endDate);
         }
 
-        query += ' ORDER BY timestamp DESC';
-        const records = db.prepare(query).all(...params);
-
-        console.log(`🔍 [ATTENDANCE] Encontrados ${records.length} registros na tabela attendance`);
-        if (records.length > 0) {
-            console.log('Sample:', records[0]);
+        // Buscar da tabela ATTENDANCE
+        let attendanceRecords = [];
+        try {
+            const attendanceQuery = `
+                SELECT a.timestamp, a.type, s.photo_url 
+                FROM attendance a
+                JOIN students s ON a.student_id = s.id
+                WHERE a.student_id = ?${dateFilter}
+                ORDER BY a.timestamp DESC
+            `;
+            attendanceRecords = db.prepare(attendanceQuery).all(...params);
+            console.log(`🔍 [ATTENDANCE] Tabela attendance: ${attendanceRecords.length} registros`);
+        } catch (e) {
+            console.log('⚠️ Erro ao buscar de attendance:', e.message);
         }
 
-        res.json(records);
+        // Buscar também da tabela ACCESS_LOGS (fallback)
+        let accessLogRecords = [];
+        try {
+            const accessLogQuery = `
+                SELECT al.timestamp, al.event_type as type, s.photo_url 
+                FROM access_logs al
+                JOIN students s ON al.student_id = s.id
+                WHERE al.student_id = ?${dateFilter}
+                ORDER BY al.timestamp DESC
+            `;
+            accessLogRecords = db.prepare(accessLogQuery).all(...params);
+            console.log(`🔍 [ATTENDANCE] Tabela access_logs: ${accessLogRecords.length} registros`);
+        } catch (e) {
+            console.log('⚠️ Erro ao buscar de access_logs:', e.message);
+        }
+
+        // Combinar registros únicos por dia
+        const uniqueDays = new Map();
+
+        [...attendanceRecords, ...accessLogRecords].forEach(record => {
+            if (!record.timestamp) return;
+            const day = record.timestamp.split('T')[0].split(' ')[0]; // "YYYY-MM-DD"
+            if (!uniqueDays.has(day)) {
+                uniqueDays.set(day, record);
+            }
+        });
+
+        const combinedRecords = Array.from(uniqueDays.values());
+        console.log(`🔍 [ATTENDANCE] Total combinado: ${combinedRecords.length} dias únicos`);
+
+        if (combinedRecords.length > 0) {
+            console.log('Sample:', combinedRecords[0]);
+        }
+
+        res.json(combinedRecords);
 
     } catch (e) {
         console.error('Erro ao buscar frequencia:', e);
