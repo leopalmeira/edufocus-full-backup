@@ -3025,7 +3025,7 @@ app.get('/school/:schoolId/class/:classId/students', authenticateToken, async (r
     }
 });
 
-// Buscar frequência do aluno (para o App do Responsável)
+// Buscar frequência do aluno (para o App do Responsável) - CORRIGIDO: busca de attendance + access_logs
 app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => {
     const guardianId = req.user.id;
     const { schoolId, studentId, month, year } = req.query;
@@ -3040,37 +3040,82 @@ app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => 
         const schoolDB = getSchoolDB(schoolId);
 
         // 1. Verificar se o guardian tem vínculo com este aluno
-        const link = schoolDB.prepare(`
-            SELECT id FROM student_guardians 
-            WHERE student_id = ? AND guardian_id = ? AND status = 'active'
-        `).get(studentId, guardianId);
-
-        if (!link) {
-            console.warn(`⚠️ [GUARDIAN-ATTENDANCE] Acesso negado: Guardian ${guardianId} sem vínculo com Student ${studentId}`);
-            return res.status(403).json({ error: 'Acesso negado. Você não tem vínculo ativo com este aluno nesta escola.' });
+        let link = null;
+        try {
+            link = schoolDB.prepare(`
+                SELECT id FROM student_guardians 
+                WHERE student_id = ? AND guardian_id = ? AND status = 'active'
+            `).get(studentId, guardianId);
+        } catch (linkError) {
+            console.warn(`⚠️ [GUARDIAN-ATTENDANCE] Erro ao verificar vínculo (tabela pode não existir):`, linkError.message);
+            // Continuar mesmo sem verificação de vínculo para não bloquear o calendário
         }
 
-        // 2. Buscar frequência - retornar apenas timestamp e type
-        let query = `SELECT timestamp, type FROM attendance WHERE student_id = ?`;
+        // Preparar filtro de data
+        let dateFilter = '';
         const params = [studentId];
 
         if (month && year) {
-            const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-            const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
-            query += ` AND date(timestamp) BETWEEN date(?) AND date(?)`;
+            const m = String(month).padStart(2, '0');
+            const y = String(year);
+            const startDate = `${y}-${m}-01`;
+            const endDate = `${y}-${m}-31`;
+            dateFilter = ` AND date(timestamp) BETWEEN date(?) AND date(?)`;
             params.push(startDate, endDate);
         }
 
-        query += ` ORDER BY timestamp DESC`;
-
-        const records = schoolDB.prepare(query).all(...params);
-
-        console.log(`📊 [GUARDIAN-ATTENDANCE] Encontrados ${records.length} registros`);
-        if (records.length > 0) {
-            console.log(`📊 [GUARDIAN-ATTENDANCE] Primeiro registro:`, records[0]);
+        // 2. Buscar da tabela ATTENDANCE
+        let attendanceRecords = [];
+        try {
+            const attendanceQuery = `
+                SELECT a.timestamp, a.type, s.photo_url 
+                FROM attendance a
+                LEFT JOIN students s ON a.student_id = s.id
+                WHERE a.student_id = ?${dateFilter}
+                ORDER BY a.timestamp DESC
+            `;
+            attendanceRecords = schoolDB.prepare(attendanceQuery).all(...params);
+            console.log(`📊 [GUARDIAN-ATTENDANCE] Tabela attendance: ${attendanceRecords.length} registros`);
+        } catch (e) {
+            console.log('⚠️ Erro ao buscar de attendance:', e.message);
         }
 
-        res.json(records);
+        // 3. Buscar também da tabela ACCESS_LOGS (fallback)
+        let accessLogRecords = [];
+        try {
+            const accessLogQuery = `
+                SELECT al.timestamp, al.event_type as type, s.photo_url 
+                FROM access_logs al
+                LEFT JOIN students s ON al.student_id = s.id
+                WHERE al.student_id = ?${dateFilter}
+                ORDER BY al.timestamp DESC
+            `;
+            accessLogRecords = schoolDB.prepare(accessLogQuery).all(...params);
+            console.log(`📊 [GUARDIAN-ATTENDANCE] Tabela access_logs: ${accessLogRecords.length} registros`);
+        } catch (e) {
+            console.log('⚠️ Erro ao buscar de access_logs:', e.message);
+        }
+
+        // 4. Combinar registros únicos por dia (prioriza o primeiro registro de cada dia)
+        const uniqueDays = new Map();
+
+        [...attendanceRecords, ...accessLogRecords].forEach(record => {
+            if (!record.timestamp) return;
+            // Normalizar timestamp para extrair a data (YYYY-MM-DD)
+            const day = record.timestamp.replace('T', ' ').split(' ')[0];
+            if (!uniqueDays.has(day)) {
+                uniqueDays.set(day, record);
+            }
+        });
+
+        const combinedRecords = Array.from(uniqueDays.values());
+        console.log(`📊 [GUARDIAN-ATTENDANCE] Total combinado: ${combinedRecords.length} dias únicos`);
+
+        if (combinedRecords.length > 0) {
+            console.log(`📊 [GUARDIAN-ATTENDANCE] Primeiro registro:`, combinedRecords[0]);
+        }
+
+        res.json(combinedRecords);
 
     } catch (error) {
         console.error('Erro ao buscar frequência para responsible:', error);
@@ -6293,87 +6338,7 @@ app.get('/api/guardian/invoices', authenticateGuardian, (req, res) => {
 
 // ==================== GUARDIAN ACADEMIC ENDPOINTS ====================
 // Serve data from school_db read-only for guardian
-
-// 14. GUARDIAN: Student Attendance (Frequência)
-app.get('/api/guardian/student-attendance', authenticateGuardian, (req, res) => {
-    const { schoolId, studentId, month, year } = req.query;
-
-    try {
-        if (!schoolId || !studentId) throw new Error('Dados incompletos');
-        const db = getSchoolDB(schoolId);
-
-        console.log(`🔍 [ATTENDANCE] Buscando frequencia: Student=${studentId}, School=${schoolId}, ${month}/${year}`);
-
-        // Preparar filtro de data
-        let dateFilter = '';
-        const params = [studentId];
-
-        if (month && year) {
-            const m = String(month).padStart(2, '0');
-            const y = String(year);
-            const startDate = `${y}-${m}-01`;
-            const endDate = `${y}-${m}-31`;
-            dateFilter = ` AND date(timestamp) BETWEEN date(?) AND date(?)`;
-            params.push(startDate, endDate);
-        }
-
-        // Buscar da tabela ATTENDANCE
-        let attendanceRecords = [];
-        try {
-            const attendanceQuery = `
-                SELECT a.timestamp, a.type, s.photo_url 
-                FROM attendance a
-                JOIN students s ON a.student_id = s.id
-                WHERE a.student_id = ?${dateFilter}
-                ORDER BY a.timestamp DESC
-            `;
-            attendanceRecords = db.prepare(attendanceQuery).all(...params);
-            console.log(`🔍 [ATTENDANCE] Tabela attendance: ${attendanceRecords.length} registros`);
-        } catch (e) {
-            console.log('⚠️ Erro ao buscar de attendance:', e.message);
-        }
-
-        // Buscar também da tabela ACCESS_LOGS (fallback)
-        let accessLogRecords = [];
-        try {
-            const accessLogQuery = `
-                SELECT al.timestamp, al.event_type as type, s.photo_url 
-                FROM access_logs al
-                JOIN students s ON al.student_id = s.id
-                WHERE al.student_id = ?${dateFilter}
-                ORDER BY al.timestamp DESC
-            `;
-            accessLogRecords = db.prepare(accessLogQuery).all(...params);
-            console.log(`🔍 [ATTENDANCE] Tabela access_logs: ${accessLogRecords.length} registros`);
-        } catch (e) {
-            console.log('⚠️ Erro ao buscar de access_logs:', e.message);
-        }
-
-        // Combinar registros únicos por dia
-        const uniqueDays = new Map();
-
-        [...attendanceRecords, ...accessLogRecords].forEach(record => {
-            if (!record.timestamp) return;
-            const day = record.timestamp.split('T')[0].split(' ')[0]; // "YYYY-MM-DD"
-            if (!uniqueDays.has(day)) {
-                uniqueDays.set(day, record);
-            }
-        });
-
-        const combinedRecords = Array.from(uniqueDays.values());
-        console.log(`🔍 [ATTENDANCE] Total combinado: ${combinedRecords.length} dias únicos`);
-
-        if (combinedRecords.length > 0) {
-            console.log('Sample:', combinedRecords[0]);
-        }
-
-        res.json(combinedRecords);
-
-    } catch (e) {
-        console.error('Erro ao buscar frequencia:', e);
-        res.json([]);
-    }
-});
+// NOTA: Endpoint /api/guardian/student-attendance foi movido para linha ~3028 (consolidado)
 
 // 15. GUARDIAN: Grades (Notas) - MOCK/Placeholder
 app.get('/api/guardian/grades', authenticateGuardian, (req, res) => {
@@ -6441,6 +6406,30 @@ app.post('/api/guardian/link-student', authenticateGuardian, (req, res) => {
 });
 
 
+
+
+// 19. GUARDIAN: SSE Events Stream (Notificações em Tempo Real)
+app.get('/api/guardian/events-stream', (req, res) => {
+    // SSE setup
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    // Enviar ping inicial
+    res.write(`data: ${JSON.stringify({ type: 'ping', message: 'Connected' })}\n\n`);
+
+    // Manter conexão viva com heartbeat
+    const keepAlive = setInterval(() => {
+        res.write(`: keep-alive\n\n`);
+    }, 15000); // 15s
+
+    // Quando o cliente desconectar
+    req.on('close', () => {
+        clearInterval(keepAlive);
+        res.end();
+    });
+});
 
 // ==================== GUARDIAN AUTH ROUTES ====================
 

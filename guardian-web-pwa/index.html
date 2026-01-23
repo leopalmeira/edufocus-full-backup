@@ -2846,6 +2846,12 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
 
             // Days
             const today = new Date();
+
+            // DEBUG: Mostrar todos os timestamps disponíveis
+            if (currentAttendanceData.length > 0) {
+                console.log('🔍 [DEBUG] Timestamps disponíveis:', currentAttendanceData.map(r => r.timestamp));
+            }
+
             for (let d = 1; d <= daysInMonth; d++) {
                 const checkDate = new Date(year, month, d);
                 const yyyy = year;
@@ -2853,7 +2859,14 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
                 const dd = String(d).padStart(2, '0');
                 const dateStr = `${yyyy}-${mm}-${dd}`;
 
-                const records = currentAttendanceData.filter(r => r.timestamp.startsWith(dateStr));
+                const records = currentAttendanceData.filter(r => {
+                    if (!r.timestamp) return false;
+                    const matches = r.timestamp.startsWith(dateStr);
+                    if (matches) {
+                        console.log(`✅ [DEBUG] Dia ${d}: ${dateStr} corresponde a ${r.timestamp}`);
+                    }
+                    return matches;
+                });
 
                 const isWeekend = (checkDate.getDay() === 0 || checkDate.getDay() === 6);
                 const isFuture = checkDate > today;
