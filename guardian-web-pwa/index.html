@@ -2825,6 +2825,7 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
 
         function renderCalendar() {
             const container = document.getElementById('calendarDays');
+            if (!container) return;
             container.innerHTML = '';
 
             const year = currentReportDate.getFullYear();
@@ -2844,13 +2845,7 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
             window.lastPresenceDays = [];
             window.lastAbsenceDays = [];
 
-            // Days
             const today = new Date();
-
-            // DEBUG: Mostrar todos os timestamps disponíveis
-            if (currentAttendanceData.length > 0) {
-                console.log('🔍 [DEBUG] Timestamps disponíveis:', currentAttendanceData.map(r => r.timestamp));
-            }
 
             for (let d = 1; d <= daysInMonth; d++) {
                 const checkDate = new Date(year, month, d);
@@ -2859,13 +2854,10 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
                 const dd = String(d).padStart(2, '0');
                 const dateStr = `${yyyy}-${mm}-${dd}`;
 
+                // Filter records for this day
                 const records = currentAttendanceData.filter(r => {
                     if (!r.timestamp) return false;
-                    const matches = r.timestamp.startsWith(dateStr);
-                    if (matches) {
-                        console.log(`✅ [DEBUG] Dia ${d}: ${dateStr} corresponde a ${r.timestamp}`);
-                    }
-                    return matches;
+                    return r.timestamp.startsWith(dateStr);
                 });
 
                 const isWeekend = (checkDate.getDay() === 0 || checkDate.getDay() === 6);
@@ -2876,6 +2868,7 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
                 let textColor = '';
                 let className = '';
 
+                // Logic: Presence always wins. If not present: check future/weekend/absent.
                 if (isPresent) {
                     bgColor = '#10b981';
                     textColor = 'white';
@@ -2889,7 +2882,7 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
                     bgColor = '#f9fafb';
                     textColor = '#d1d5db';
                 } else {
-                    // Dia útil passado sem presença = Falta
+                    // Past weekday without presence = Absent
                     bgColor = '#ef4444';
                     textColor = 'white';
                     className = 'day-absent';
@@ -2897,13 +2890,20 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
                     window.lastAbsenceDays.push(d);
                 }
 
+                // Photo Logic (Restored)
+                const record = records.length > 0 ? records[0] : null;
+                const photoUrl = record && record.photo_url ? record.photo_url : null;
+
+                const photoStyle = (photoUrl && isPresent)
+                    ? `background-image: url('${photoUrl}'); background-size: cover; background-position: center;`
+                    : `background: ${bgColor};`;
+
                 container.innerHTML += `
-                    <div class="calendar-day ${className}" style="background: ${bgColor}; color: ${textColor}; font-weight: 600; position: relative;">
-                        <span style="position: relative; z-index: 2;">${d}</span>
+                    <div class="calendar-day ${className}" style="${photoStyle} color: ${textColor}; font-weight: 600; position: relative;">
+                        <span style="position: relative; z-index: 2; ${isPresent && photoUrl ? 'text-shadow: 0 1px 3px rgba(0,0,0,0.8);' : ''}">${d}</span>
+                        ${isPresent && photoUrl ? '<div style="position: absolute; inset: 0; background: rgba(16,185,129,0.4); border-radius: inherit;"></div>' : ''}
                     </div>
                 `;
-
-
             }
 
             // Update stat cards
