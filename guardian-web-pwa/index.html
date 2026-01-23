@@ -2838,18 +2838,9 @@ GPS: ${student.school_latitude}, ${student.school_longitude}
                     window.lastAbsenceDays.push(d);
                 }
 
-                // Photo Logic (Restored)
-                const record = records.length > 0 ? records[0] : null;
-                const photoUrl = record && record.photo_url ? record.photo_url : null;
-
-                const photoStyle = (photoUrl && isPresent)
-                    ? `background-image: url('${photoUrl}'); background-size: cover; background-position: center;`
-                    : `background: ${bgColor};`;
-
                 container.innerHTML += `
-                    <div class="calendar-day ${className}" style="${photoStyle} color: ${textColor}; font-weight: 600; position: relative;">
-                        <span style="position: relative; z-index: 2; ${isPresent && photoUrl ? 'text-shadow: 0 1px 3px rgba(0,0,0,0.8);' : ''}">${d}</span>
-                        ${isPresent && photoUrl ? '<div style="position: absolute; inset: 0; background: rgba(16,185,129,0.4); border-radius: inherit;"></div>' : ''}
+                    <div class="calendar-day ${className}" style="background: ${bgColor}; color: ${textColor}; font-weight: 600; position: relative;">
+                        <span>${d}</span>
                     </div>
                 `;
             }
